@@ -53,42 +53,31 @@ const LandingPage = () => {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link 
-                to="/apply" 
-                className="bg-white text-nhs-blue px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors flex items-center justify-center space-x-2"
-              >
-                <span>Apply Now</span>
-                <ArrowRight size={20} />
-              </Link>
-              <Link 
-                to="/login" 
-                className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-nhs-blue transition-colors"
-              >
-                Login
-              </Link>
-            </div>
-            
-            {/* Get Your Own IMPACT System CTA */}
-            <div className="mt-8 pt-8 border-t border-white/20">
-              <div className="text-center mb-4">
-                <p className="text-white/90 text-lg mb-2">
-                  Want to run IMPACT courses at your hospital?
-                </p>
-                <p className="text-white/80 text-sm">
-                  Get your own IMPACT Management System in minutes
-                </p>
-              </div>
-              <div className="flex justify-center">
-                <Link 
-                  to="/provision/start" 
-                  className="bg-nhs-green hover:bg-nhs-dark-green text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
-                >
-                  <span>Get your own IMPACT Management System</span>
-                  <ArrowRight size={20} />
-                </Link>
-              </div>
-            </div>
+                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
+               <Link 
+                 to="/apply" 
+                 className="bg-white text-nhs-blue px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors flex items-center justify-center space-x-2"
+               >
+                 <span>Apply Now</span>
+                 <ArrowRight size={20} />
+               </Link>
+               <Link 
+                 to="/login" 
+                 className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-nhs-blue transition-colors"
+               >
+                 Login
+               </Link>
+             </div>
+             
+             {/* Small link to get your own system */}
+             <div className="mt-6 text-center">
+               <Link 
+                 to="/get-your-own-system" 
+                 className="text-white/80 hover:text-white text-sm underline transition-colors"
+               >
+                 Want to run IMPACT courses at your hospital? Get your own system →
+               </Link>
+             </div>
           </div>
         </div>
       </section>

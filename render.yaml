@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: impact-course-admin
+    env: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    startCommand: npm run preview
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: VITE_APP_URL
+        value: https://impact-course-admin.onrender.com
+      - key: VITE_APP_NAME
+        value: IMPACT Course Admin
+      - key: VITE_FIREBASE_API_KEY
+        value: AIzaSyA1OtaVxfGUEMlDFxGYqX6YWxfSomL9-ac
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        value: mwl-impact.firebaseapp.com
+      - key: VITE_FIREBASE_PROJECT_ID
+        value: mwl-impact
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        value: mwl-impact.firebasestorage.app
+      - key: VITE_FIREBASE_MESSAGING_SENDER_ID
+        value: 1068856174628
+      - key: VITE_FIREBASE_APP_ID
+        value: 1:1068856174628:web:c61d6ab3d573928ee950b1
+      - key: VITE_FIREBASE_MEASUREMENT_ID
+        value: G-JMVD092V71
+      - key: VITE_FIREBASE_FUNCTIONS_REGION
+        value: us-central1
+      - key: VITE_EMAIL_FROM
+        value: noreply@impact-course.com
+      - key: VITE_EMAIL_SUPPORT
+        value: support@impact-course.com
+      - key: VITE_BUILD_DIR
+        value: dist
+      - key: VITE_FIRESTORE_REGION
+        value: europe-west2
+      - key: VITE_DEV_MODE
+        value: false
+      - key: VITE_DEBUG
+        value: false
+    healthCheckPath: /
+    autoDeploy: true
+    branch: main

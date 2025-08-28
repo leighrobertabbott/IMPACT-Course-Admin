@@ -22,6 +22,7 @@ import ProvisionCallback from './pages/ProvisionCallback';
 import ProvisionConfirm from './pages/ProvisionConfirm';
 import ProvisionDone from './pages/ProvisionDone';
 import Setup from './pages/Setup';
+import GetYourOwnSystem from './pages/GetYourOwnSystem';
 import OAuthErrorHandler from './components/OAuthErrorHandler';
 
 function App() {
@@ -43,8 +44,9 @@ function App() {
           <Route path="/provision/callback" element={<ProvisionCallback />} />
           <Route path="/provision/confirm" element={<ProvisionConfirm />} />
           <Route path="/provision/done" element={<ProvisionDone />} />
-          <Route path="/provision/error" element={<OAuthErrorHandler />} />
-          <Route path="/setup" element={<Setup />} />
+                  <Route path="/provision/error" element={<OAuthErrorHandler />} />
+        <Route path="/setup" element={<Setup />} />
+        <Route path="/get-your-own-system" element={<GetYourOwnSystem />} />
           
           {/* Protected Routes - Wrapped with PhotoRequirement for candidates */}
           <Route 
