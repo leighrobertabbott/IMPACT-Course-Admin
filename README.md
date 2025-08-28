@@ -388,3 +388,89 @@ Visit the live application: [IMPACT Course Management System](https://mwl-impact
 **Built with ❤️ for the NHS IMPACT Course Team at Whiston Hospital**
 
 *Empowering healthcare professionals through advanced interventional cardiology education*
+
+## One-Click Setup (For Hospital Administrators)
+
+### Get Your Own IMPACT Management System
+
+Want to run IMPACT courses at your hospital? Choose the option that works best for you.
+
+## Option 1: We'll Set It Up For You (Recommended)
+
+**Best for:** Non-technical users, hospital administrators, anyone who wants it done for them
+
+#### How It Works
+
+1. **Email us** at setup@impact-course.com
+2. **Tell us your hospital name** and contact details
+3. **We'll create your IMPACT system** and send you the login details
+4. **You'll get a live website** like: https://your-hospital-impact.web.app
+
+#### What We Do For You
+
+- ✅ **Create your Firebase project** with your hospital name
+- ✅ **Set up your database** for course data
+- ✅ **Deploy your website** with all features
+- ✅ **Create your admin account** ready to use
+- ✅ **Send you login details** and instructions
+
+#### Start Setup
+
+**Email us:** setup@impact-course.com
+
+**Or call:** 0151 705 7428
+
+**Cost:** Free setup service
+
+---
+
+## Option 2: Technical Deployment Options
+
+### Render Deployment
+
+**Best for:** Users comfortable with web platforms
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/leighrobertabbott/IMPACT-Course-Admin)
+
+### Vercel Deployment
+
+**Best for:** Users familiar with development platforms
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
+
+### Google Cloud Shell (Advanced)
+
+**Best for:** Technical users who want their own Firebase project
+
+**Note:** This option requires technical knowledge. After opening Cloud Shell, run:
+1. `chmod +x setup-impact.sh`
+2. `./setup-impact.sh`
+
+[![Open in Google Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/open?cloudshell_git_repo=https://github.com/leighrobertabbott/IMPACT-Course-Admin&cloudshell_working_dir=/&force_new_clone=true)
+
+---
+
+## Your Live Site
+
+Once setup is complete, you'll get a URL like:
+- **We set it up:** `https://your-hospital-impact.web.app`
+- **Render:** `https://your-site-name.onrender.com`
+- **Vercel:** `https://your-site-name.vercel.app`
+- **Cloud Shell:** `https://your-site-name-abc123.web.app`
+
+## Next Steps
+
+1. Complete the admin setup wizard to create your first user account
+2. Add your hospital details and contact information
+3. Create your first IMPACT course and add faculty members
+4. Start accepting candidate applications
+
+## Technical Requirements
+
+- **We set it up:** No technical knowledge required
+- **Render/Vercel:** Web platform accounts (free)
+- **Cloud Shell:** Google account, basic familiarity with terminals
+
+## Support
+
+Need help? Contact us at support@impact-course.com or call 0151 705 7428
