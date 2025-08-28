@@ -226,6 +226,11 @@ const CourseManagement = () => {
       // Set the most recent active course as selected
       const activeCourse = coursesData.find(c => !c.archived) || coursesData[0];
       setSelectedCourse(activeCourse);
+      
+      // Debug: Log course selection
+      console.log('All courses:', coursesData);
+      console.log('Selected course:', activeCourse);
+      console.log('Course data:', courseData);
     } catch (error) {
       console.error('Error fetching courses:', error);
     }
@@ -677,6 +682,11 @@ const CourseManagement = () => {
       const subjectsData = subjectsSnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(subject => subject.courseId === selectedCourse.id && !subject.deleted);
+      
+      // Debug: Log programme subjects fetch
+      console.log('Fetching programme subjects for course:', selectedCourse.id);
+      console.log('All subjects in DB:', subjectsSnapshot.docs.map(doc => ({ id: doc.id, courseId: doc.data().courseId, name: doc.data().name })));
+      console.log('Filtered subjects for this course:', subjectsData);
       
       setProgrammeSubjects(subjectsData);
     } catch (error) {
@@ -2559,7 +2569,7 @@ const CourseManagement = () => {
       {/* Prospectus Generator Modal */}
       {showProspectusGenerator && (
         <ProspectusGenerator
-          selectedCourse={courseData}
+          selectedCourse={selectedCourse}
           onClose={() => setShowProspectusGenerator(false)}
         />
       )}
