@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 import { Download, FileText, Users, MapPin, Calendar, Clock, Award, Building, Phone, Mail, Globe, Car, Train, Bus } from 'lucide-react';
 
@@ -42,6 +42,13 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
         id: doc.id,
         ...doc.data()
       }));
+      
+      // Debug: Log the raw programme data
+      console.log('Raw programme data:', programmeData);
+      console.log('Total programme items:', programmeData.length);
+      console.log('Workshop rotation items:', programmeData.filter(item => item.isWorkshopRotation).length);
+      console.log('Non-workshop items:', programmeData.filter(item => !item.isWorkshopRotation).length);
+      
       // Sort by day and time
       programmeData.sort((a, b) => {
         if (a.day !== b.day) return a.day - b.day;
@@ -332,7 +339,7 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
           item.faculty?.map(f => f.name).join(', ') || 'TBC'
         ]);
         
-        doc.autoTable({
+        autoTable(doc, {
           startY: 60 + (dayIndex * 120),
           head: [['Time', 'Duration', 'Session', 'Type', 'Faculty']],
           body: tableData,
