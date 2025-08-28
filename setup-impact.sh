@@ -62,14 +62,19 @@ if [ "$NEED_FUNCTIONS" = "yes" ]; then
   echo
   echo "💳 Cloud Functions require billing. We'll help you link it."
   URL="https://console.cloud.google.com/billing/projects/$PROJECT_ID"
-  echo "Opening: $URL"
-  (command -v xdg-open >/dev/null && xdg-open "$URL") || (command -v open >/dev/null && open "$URL") || true
-  echo "⏳ Waiting for billing to be enabled (checks every 8s)..."
+  echo "📋 Please follow these steps:"
+  echo "1. Open this URL in a new tab: $URL"
+  echo "2. Click 'Link a billing account'"
+  echo "3. Select or create a billing account"
+  echo "4. Wait for the page to confirm billing is linked"
+  echo
+  echo "⏳ The script will check every 8 seconds for billing to be enabled..."
   for i in {1..60}; do
     LINKED=$(gcloud beta billing projects describe "$PROJECT_ID" --format="value(billingEnabled)" 2>/dev/null || echo "False")
-    [ "$LINKED" = "True" ] && { echo "✅ Billing enabled."; break; }
+    [ "$LINKED" = "True" ] && { echo "✅ Billing enabled!"; break; }
+    echo "   Checking... (attempt $i/60)"
     sleep 8
-    [ $i -eq 60 ] && { echo "❌ Billing not linked. Please link and re-run."; exit 1; }
+    [ $i -eq 60 ] && { echo "❌ Billing not linked after 8 minutes. Please link billing and re-run the script."; exit 1; }
   done
 fi
 
