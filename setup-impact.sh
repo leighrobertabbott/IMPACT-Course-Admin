@@ -30,7 +30,7 @@ read HOSPITAL
 BASE_ID=$(echo "$HOSPITAL" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g;s/-\+/-/g;s/^-//;s/-$//')
 MAX_BASE=$((30-7)) # leave 7 for suffix
 [ ${#BASE_ID} -gt $MAX_BASE ] && BASE_ID="${BASE_ID:0:$MAX_BASE}"
-SUFFIX=$(LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)
+SUFFIX=$(date +%s | tail -c 6)
 PROJECT_ID="${BASE_ID}-${SUFFIX}"
 
 echo
