@@ -1,0 +1,58 @@
+name: impact-course-admin
+version: 1.0
+ui:
+  productName: IMPACT Course Admin
+  description: Self-hosted course management system for hospitals
+  icon: 🏥
+defaults:
+  region: europe-west2
+  budgetMonthlyGBP: 15
+  auth: email_link
+  projectPrefix: impact
+parameters:
+  - key: adminEmail
+    label: Admin email for first login
+    required: true
+    type: email
+    placeholder: admin@yourhospital.com
+  - key: hospitalName
+    label: Hospital name
+    required: true
+    type: text
+    placeholder: Whiston Hospital
+secrets:
+  - key: RESEND_API_KEY
+    label: Resend API Key (for emails)
+    required: true
+    description: Get from https://resend.com/api-keys
+services:
+  - kind: web
+    runtime: node18
+    entry: ./
+    hosting: static
+    build: npm run build
+    output: dist
+  - kind: db
+    type: firestore
+    tier: serverless
+    region: europe-west2
+  - kind: functions
+    entry: ./functions
+    runtime: node18
+    region: europe-west2
+policies:
+  costCapGBP: 15
+  egress: restricted
+  dataResidency: eu
+postInstall:
+  - type: url
+    label: Open Admin Setup
+    path: /setup
+  - type: url
+    label: Open App
+    path: /
+healthChecks:
+  - url: /
+    expect: 200
+  - url: /setup
+    expect: 200
