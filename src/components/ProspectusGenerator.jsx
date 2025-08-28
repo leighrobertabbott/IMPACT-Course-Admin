@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { jsPDF } from 'jspdf';
+import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import toast from 'react-hot-toast';
 import { Download, FileText, Users, MapPin, Calendar, Clock, Award, Building, Phone, Mail, Globe, Car, Train, Bus } from 'lucide-react';
@@ -313,7 +313,7 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
     const days = ['Day 1', 'Day 2'];
     
     days.forEach((day, dayIndex) => {
-      const dayProgramme = programme.filter(item => item.day === dayIndex + 1);
+      const dayProgramme = programme.filter(item => item.day === dayIndex + 1 && !item.isWorkshopRotation);
       
       if (dayProgramme.length > 0) {
         // Day header
@@ -481,7 +481,9 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
             </div>
             <div className="flex items-center justify-between mt-2">
               <span className="font-medium text-nhs-dark-grey">Programme Sessions:</span>
-              <span className="text-nhs-blue font-semibold">{programme.length}</span>
+              <span className="text-nhs-blue font-semibold">
+                {programme.filter(item => !item.isWorkshopRotation).length}
+              </span>
             </div>
           </div>
           

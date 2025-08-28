@@ -3389,10 +3389,12 @@ IMPACT @ Whiston Hospital`,
       />
 
       {/* Prospectus Generator Modal */}
-      <ProspectusGenerator
-        selectedCourse={selectedCourse}
-        onClose={() => setShowProspectusGenerator(false)}
-      />
+      {showProspectusGenerator && (
+        <ProspectusGenerator
+          selectedCourse={selectedCourse}
+          onClose={() => setShowProspectusGenerator(false)}
+        />
+      )}
 
       {/* Materials Upload Modal */}
       {showUploadMaterialsModal && (

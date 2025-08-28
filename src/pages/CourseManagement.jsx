@@ -2557,10 +2557,12 @@ const CourseManagement = () => {
       />
 
       {/* Prospectus Generator Modal */}
-      <ProspectusGenerator
-        selectedCourse={courseData}
-        onClose={() => setShowProspectusGenerator(false)}
-      />
+      {showProspectusGenerator && (
+        <ProspectusGenerator
+          selectedCourse={courseData}
+          onClose={() => setShowProspectusGenerator(false)}
+        />
+      )}
 
       {/* Upload Materials Modal */}
       {showUploadMaterialsModal && (
