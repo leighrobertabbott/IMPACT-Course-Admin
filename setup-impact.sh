@@ -65,27 +65,19 @@ fi
 echo "2️⃣ Setting project as default..."
 gcloud config set project "$project_id"
 
-# Step 3: Enable billing (user will need to do this manually)
 echo ""
-echo "💰 BILLING SETUP REQUIRED"
-echo "========================="
-echo "You need to enable billing for this project:"
-echo "1. Go to: https://console.cloud.google.com/billing/projects"
-echo "2. Find project: $project_id"
-echo "3. Click 'Link a billing account'"
-echo "4. Select or create a billing account"
+echo "🆓 Using Free Tier Services"
+echo "=========================="
+echo "This setup uses only free-tier services - no billing required!"
+echo "Your IMPACT system will work within Google's free quotas."
 echo ""
-echo "Press Enter when billing is enabled..."
-read -r
 
-# Step 4: Enable required APIs
-echo "3️⃣ Enabling required APIs..."
+# Step 4: Enable required APIs (Free Tier Only)
+echo "3️⃣ Enabling required APIs (Free Tier)..."
 gcloud services enable firebase.googleapis.com
-gcloud services enable cloudresourcemanager.googleapis.com
-gcloud services enable serviceusage.googleapis.com
 gcloud services enable firestore.googleapis.com
-gcloud services enable cloudfunctions.googleapis.com
-gcloud services enable storage.googleapis.com
+gcloud services enable firebasehosting.googleapis.com
+gcloud services enable identitytoolkit.googleapis.com
 
 # Step 5: Initialize Firebase
 echo "4️⃣ Initializing Firebase..."
@@ -116,8 +108,8 @@ npm install
 echo "🔨 Building the application..."
 npm run build
 
-# Step 12: Deploy to Firebase Hosting
-echo "🚀 Deploying to Firebase Hosting..."
+# Step 12: Deploy to Firebase Hosting (Free Tier)
+echo "🚀 Deploying to Firebase Hosting (Free Tier)..."
 firebase deploy --only hosting --project="$project_id"
 
 # Step 13: Get the live URL
@@ -134,6 +126,11 @@ echo "=================="
 echo ""
 echo "🏥 Your IMPACT Course Management System is now live!"
 echo "🌐 Live URL: $live_url"
+echo ""
+echo "🆓 Free Tier Benefits:"
+echo "• No billing required"
+echo "• Works within Google's free quotas"
+echo "• Hosting, Firestore, and Auth included"
 echo ""
 echo "📋 Next Steps:"
 echo "1. Visit your live site: $live_url"
