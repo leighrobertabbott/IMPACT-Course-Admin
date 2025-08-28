@@ -23,7 +23,8 @@ if ! command -v firebase >/dev/null; then
 fi
 
 # 2) Ask hospital name → make a valid project id (<= 30 chars)
-read -rp "🏥 Enter your hospital name (e.g. 'Whiston Hospital'): " HOSPITAL
+echo -n "🏥 Enter your hospital name (e.g. 'Whiston Hospital'): "
+read HOSPITAL
 [ -z "${HOSPITAL}" ] && { echo "❌ Hospital name is required."; exit 1; }
 
 BASE_ID=$(echo "$HOSPITAL" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g;s/-\+/-/g;s/^-//;s/-$//')
@@ -36,7 +37,8 @@ echo
 echo "📋 Summary:"
 echo "  Hospital   : $HOSPITAL"
 echo "  Project ID : $PROJECT_ID"
-read -rp "Proceed? (y/N): " OK; [[ ! "$OK" =~ ^[Yy]$ ]] && { echo "Cancelled."; exit 0; }
+echo -n "Proceed? (y/N): "
+read OK; [[ ! "$OK" =~ ^[Yy]$ ]] && { echo "Cancelled."; exit 0; }
 
 # 3) Create project (idempotent-ish)
 echo "1️⃣  Creating project..."
@@ -48,7 +50,8 @@ fi
 gcloud config set project "$PROJECT_ID" >/dev/null
 
 # 4) Optional: billing auto-link (advanced users)
-read -rp "Have a Billing Account ID to auto-link? (leave blank to open the billing page): " BILLING
+echo -n "Have a Billing Account ID to auto-link? (leave blank to open the billing page): "
+read BILLING
 if [ -n "${BILLING:-}" ]; then
   echo "🔗 Linking billing account $BILLING..."
   gcloud beta billing projects link "$PROJECT_ID" --billing-account="$BILLING" || true
