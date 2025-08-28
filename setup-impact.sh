@@ -23,9 +23,15 @@ if [ -z "$hospital_name" ]; then
     exit 1
 fi
 
-# Create a clean project ID from hospital name
-project_id=$(echo "$hospital_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-\|-$//g')
-project_id="${project_id}-impact-$(date +%s)"
+# Create a clean project ID from hospital name (max 30 chars)
+base_id=$(echo "$hospital_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-\|-$//g')
+# Truncate to fit within 30 char limit, leaving room for timestamp
+max_base_length=$((30 - 10))  # 10 chars for timestamp
+if [ ${#base_id} -gt $max_base_length ]; then
+    base_id=$(echo "$base_id" | cut -c1-$max_base_length)
+fi
+timestamp=$(date +%s | tail -c 6)  # Use last 6 digits of timestamp
+project_id="${base_id}-${timestamp}"
 
 echo ""
 echo "📋 Setup Summary:"
