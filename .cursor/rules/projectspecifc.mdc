@@ -1,0 +1,46 @@
+---
+description: "Project-wide guardrails + sources of truth"
+alwaysApply: true
+---
+
+Tripwire: Do NOT read any files until INVENTORY (repo search only) and PLAN are shown and approved.
+
+# Canonical references
+- `docs/CODE_INDEX.md` is the single source of truth for folder purposes, key exports, and **DoNotDuplicate** items.
+- Always consult `docs/CODE_INDEX.md` before creating new files, routes, utils, or types.
+
+# Default workflow for every task in this repo
+1) **INVENTORY**
+   - Search the repo for existing functions, hooks, utils, routes, and types related to the task.
+   - Show file paths + matching lines from search results (do not guess).
+   - Summarize relevance.
+
+2) **PLAN**
+   - Based on INVENTORY **and** DoNotDuplicate, list the exact files to edit.
+   - Reuse or extend existing implementations; do not create parallel versions.
+   - Present a minimal-diff plan (no code yet).
+
+3) **PATCH**
+   - Apply minimal diffs, citing exact file paths in each patch block.
+   - No new utils/routes/types if an equivalent exists.
+   - Keep changes local; avoid repo-wide refactors unless requested.
+
+4) **AFTER**
+   - Update only the affected entries in `docs/CODE_INDEX.md`.
+   - Keep that file under ~1,500 tokens.
+
+# Project conventions (adjust if paths differ)
+- **Auth:** `src/hooks/useAuth.(ts|tsx|js|jsx)` — tokens/roles/guards. Do **not** duplicate auth logic.
+- **Route guard:** `src/components/ProtectedRoute.(tsx|jsx)` — integrate all protection here.
+- **Error handling:** `src/components/ErrorBoundary.(tsx|jsx)` — integrate try/catch/reporting here.
+- **HTTP client:** `src/utils/fetchJson.(ts|js)` — central network wrapper. Do **not** add parallel clients.
+- **User types:** `src/types/User.(ts|tsc|js)` — single source of truth for user model.
+- **UI shell:** `src/components/Header.(tsx|jsx)`
+- **Representative pages:** `src/pages/LandingPage.(tsx|jsx)`, `src/pages/Login.(tsx|jsx)`, `src/pages/ApplicationForm.(tsx|jsx)`, `src/pages/Dashboard.(tsx|jsx)`
+- **Misc components mentioned:** `src/components/PhotoRequirement.(tsx|jsx)`, `src/tutorials/GeneralOfficeTutorial.(tsx|jsx)`
+
+# Tripwires (hard rules)
+- Before creating any new file, **search** for an existing equivalent. If one exists, **extend** it.
+- Do not invent new directories or “v2” files for auth, routing, HTTP, or types without explicit instruction.
+- When adding a type/interface, **search** and reuse existing definitions.
+- Always cite file paths in INVENTORY, PLAN, and PATCH.
