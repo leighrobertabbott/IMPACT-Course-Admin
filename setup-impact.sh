@@ -66,54 +66,95 @@ echo "2️⃣ Setting project as default..."
 gcloud config set project "$project_id"
 
 echo ""
-echo "🆓 Using Free Tier Services"
-echo "=========================="
-echo "This setup uses only free-tier services - no billing required!"
-echo "Your IMPACT system will work within Google's free quotas."
+echo "💰 Billing Setup Required"
+echo "========================="
+echo "Your IMPACT system needs billing enabled for Cloud Functions."
+echo "Don't worry - this is just to verify your account."
+echo "You'll only be charged if you exceed free quotas (very unlikely)."
 echo ""
 
-# Step 4: Enable required APIs (Free Tier Only)
-echo "3️⃣ Enabling required APIs (Free Tier)..."
+# Step 3: Auto-open billing page and wait for setup
+echo "4️⃣ Opening billing setup page..."
+echo "Please complete these steps:"
+echo "1. Click 'Authorize' if prompted"
+echo "2. Click 'Link Billing Account'"
+echo "3. Select or create a billing account"
+echo "4. Click 'Continue'"
+echo ""
+
+# Open the billing page automatically
+billing_url="https://console.cloud.google.com/billing/projects/$project_id"
+echo "Opening: $billing_url"
+if command -v xdg-open &> /dev/null; then
+    xdg-open "$billing_url"
+elif command -v open &> /dev/null; then
+    open "$billing_url"
+else
+    echo "Please manually open: $billing_url"
+fi
+
+echo ""
+echo "⏳ Waiting for billing to be enabled..."
+echo "The script will continue automatically once billing is linked."
+echo ""
+
+# Poll for billing status
+while true; do
+    billing_status=$(gcloud billing projects describe "$project_id" --format="value(billingAccountName)" 2>/dev/null)
+    if [ -n "$billing_status" ] && [ "$billing_status" != "" ]; then
+        echo "✅ Billing enabled successfully!"
+        break
+    fi
+    echo "⏳ Still waiting for billing setup... (checking every 10 seconds)"
+    sleep 10
+done
+
+echo ""
+
+# Step 5: Enable required APIs
+echo "5️⃣ Enabling required APIs..."
 gcloud services enable firebase.googleapis.com
 gcloud services enable firestore.googleapis.com
 gcloud services enable firebasehosting.googleapis.com
 gcloud services enable identitytoolkit.googleapis.com
+gcloud services enable cloudfunctions.googleapis.com
+gcloud services enable cloudbuild.googleapis.com
 
-# Step 5: Initialize Firebase
-echo "4️⃣ Initializing Firebase..."
+# Step 6: Initialize Firebase
+echo "6️⃣ Initializing Firebase..."
 firebase projects:addfirebase "$project_id"
 
-# Step 6: Create Firestore database
-echo "5️⃣ Creating Firestore database..."
+# Step 7: Create Firestore database
+echo "7️⃣ Creating Firestore database..."
 gcloud firestore databases create --region=europe-west2 --project="$project_id"
 
-# Step 7: Create Firebase web app
-echo "6️⃣ Creating Firebase web app..."
+# Step 8: Create Firebase web app
+echo "8️⃣ Creating Firebase web app..."
 firebase apps:create WEB "$hospital_name IMPACT" --project="$project_id"
 
-# Step 8: Get Firebase config
-echo "7️⃣ Getting Firebase configuration..."
+# Step 9: Get Firebase config
+echo "9️⃣ Getting Firebase configuration..."
 firebase_config=$(firebase apps:sdkconfig WEB --project="$project_id" --json)
 
-# Step 9: Create web-config directory and save config
-echo "8️⃣ Saving Firebase configuration..."
+# Step 10: Create web-config directory and save config
+echo "🔟 Saving Firebase configuration..."
 mkdir -p web-config
 echo "$firebase_config" > web-config/firebaseConfig.json
 
-# Step 10: Install dependencies
-echo "9️⃣ Installing dependencies..."
+# Step 11: Install dependencies
+echo "1️⃣1️⃣ Installing dependencies..."
 npm install
 
-# Step 11: Build the application
-echo "🔨 Building the application..."
+# Step 12: Build the application
+echo "1️⃣2️⃣ Building the application..."
 npm run build
 
-# Step 12: Deploy to Firebase Hosting (Free Tier)
-echo "🚀 Deploying to Firebase Hosting (Free Tier)..."
+# Step 13: Deploy to Firebase Hosting
+echo "1️⃣3️⃣ Deploying to Firebase Hosting..."
 firebase deploy --only hosting --project="$project_id"
 
-# Step 13: Get the live URL
-echo "10️⃣ Getting your live URL..."
+# Step 14: Get the live URL
+echo "1️⃣4️⃣ Getting your live URL..."
 live_url=$(firebase hosting:channel:list --project="$project_id" --json | jq -r '.result.channels[0].url // empty')
 
 if [ -z "$live_url" ]; then
@@ -127,10 +168,10 @@ echo ""
 echo "🏥 Your IMPACT Course Management System is now live!"
 echo "🌐 Live URL: $live_url"
 echo ""
-echo "🆓 Free Tier Benefits:"
-echo "• No billing required"
+echo "💳 Billing Information:"
+echo "• Billing enabled for Cloud Functions"
 echo "• Works within Google's free quotas"
-echo "• Hosting, Firestore, and Auth included"
+echo "• Only charged if you exceed free limits"
 echo ""
 echo "📋 Next Steps:"
 echo "1. Visit your live site: $live_url"
