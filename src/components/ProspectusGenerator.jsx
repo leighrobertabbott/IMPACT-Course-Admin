@@ -38,10 +38,12 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
       const programmeRef = collection(db, 'programmeSubjects');
       const q = query(programmeRef, where('courseId', '==', selectedCourse.id));
       const querySnapshot = await getDocs(q);
-      const programmeData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const programmeData = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter(item => !item.deleted);
       
       // Debug: Log the raw programme data
       console.log('Raw programme data:', programmeData);
