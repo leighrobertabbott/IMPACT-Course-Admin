@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import ProgrammeBuilderModal from '../components/ProgrammeBuilderModal';
 import FacultyManagementModal from '../components/FacultyManagementModal';
+import ProspectusGenerator from '../components/ProspectusGenerator';
 
 const CourseManagement = () => {
   // Navigation state
@@ -64,6 +65,7 @@ const CourseManagement = () => {
   // New state for faculty and materials
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
   const [showUploadMaterialsModal, setShowUploadMaterialsModal] = useState(false);
+  const [showProspectusGenerator, setShowProspectusGenerator] = useState(false);
   const [materialsForm, setMaterialsForm] = useState({
     title: '',
     description: '',
@@ -2460,6 +2462,13 @@ const CourseManagement = () => {
                 <Mail size={20} />
                 <span>Send Course Reminders</span>
               </button>
+              <button
+                onClick={() => setShowProspectusGenerator(true)}
+                className="flex items-center space-x-3 p-3 bg-nhs-dark-grey text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                <FileText size={20} />
+                <span>Generate Course Prospectus</span>
+              </button>
             </div>
           </div>
 
@@ -2545,6 +2554,12 @@ const CourseManagement = () => {
         faculty={faculty}
         onFacultyUpdate={handleFacultyUpdate}
         mode="add"
+      />
+
+      {/* Prospectus Generator Modal */}
+      <ProspectusGenerator
+        selectedCourse={courseData}
+        onClose={() => setShowProspectusGenerator(false)}
       />
 
       {/* Upload Materials Modal */}

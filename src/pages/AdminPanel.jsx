@@ -45,6 +45,7 @@ import {
 import EmailTemplateManager from '../components/EmailTemplateManager';
 import ProgrammeBuilderModal from '../components/ProgrammeBuilderModal';
 import FacultyManagementModal from '../components/FacultyManagementModal';
+import ProspectusGenerator from '../components/ProspectusGenerator';
 
 const AdminPanel = () => {
   // Core state
@@ -88,6 +89,7 @@ const AdminPanel = () => {
   // Faculty management
   const [faculty, setFaculty] = useState([]);
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
+  const [showProspectusGenerator, setShowProspectusGenerator] = useState(false);
   
   // Materials management
   const [courseMaterials, setCourseMaterials] = useState([]);
@@ -1777,6 +1779,19 @@ IMPACT @ Whiston Hospital`,
               <p className="text-sm text-gray-500">Email candidates</p>
             </div>
           </button>
+
+          <button 
+            onClick={() => setShowProspectusGenerator(true)}
+            className="flex items-start p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left w-full h-full"
+          >
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+              <FileText className="text-blue-600" size={20} />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-gray-900">Generate Prospectus</p>
+              <p className="text-sm text-gray-500">Create course prospectus</p>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -3371,6 +3386,12 @@ IMPACT @ Whiston Hospital`,
         faculty={faculty}
         onFacultyUpdate={handleFacultyUpdate}
         mode="add"
+      />
+
+      {/* Prospectus Generator Modal */}
+      <ProspectusGenerator
+        selectedCourse={selectedCourse}
+        onClose={() => setShowProspectusGenerator(false)}
       />
 
       {/* Materials Upload Modal */}

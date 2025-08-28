@@ -40,6 +40,7 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 | `ProgrammeBuilderModal.jsx` | Course programme creation | Drag-drop programme builder | Course management | ✅ |
 | `EnhancedProgrammeDisplay.jsx` | Programme visualization | Interactive programme display | Candidate dashboard | ✅ |
 | `FacultyManagementModal.jsx` | Faculty member management | Faculty CRUD operations | Admin panel | ✅ |
+| `ProspectusGenerator.jsx` | Course prospectus generation | PDF prospectus creation with course details | Admin panel, Course management | ✅ |
 
 ### Pages (`src/pages/`)
 
