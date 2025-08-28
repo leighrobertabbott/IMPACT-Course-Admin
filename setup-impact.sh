@@ -1,185 +1,143 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# IMPACT Course Management System - One-Click Setup Script
-# This script automatically sets up a complete IMPACT system for your hospital
+# ---------- CONFIGURE THESE ----------
+REGION="europe-west2"           # Firestore & (optional) Functions region
+BUILD_DIR="dist"                # Your static build directory ('out' for Next export, 'dist' for Vite)
+NEED_FUNCTIONS="yes"            # "yes" if you must deploy Cloud Functions
+# ------------------------------------
 
 echo "🚀 IMPACT Course Management System - One-Click Setup"
-echo "=================================================="
-echo ""
+echo "===================================================="
+echo
 
-# Check if gcloud is available
-if ! command -v gcloud &> /dev/null; then
-    echo "❌ Error: Google Cloud CLI is not available."
-    echo "Please make sure you're running this in Google Cloud Shell."
-    exit 1
+# 0) Pre-checks
+if ! command -v gcloud >/dev/null; then
+  echo "❌ Google Cloud CLI not found. Please use Google Cloud Shell."; exit 1
 fi
 
-# Get hospital name
-echo "🏥 Please enter your hospital name (e.g., 'Whiston Hospital'):"
-read -r hospital_name
-
-if [ -z "$hospital_name" ]; then
-    echo "❌ Hospital name is required. Exiting."
-    exit 1
+# 1) Install Firebase CLI if missing
+if ! command -v firebase >/dev/null; then
+  echo "🔧 Installing Firebase CLI..."
+  npm install -g firebase-tools >/dev/null 2>&1
 fi
 
-# Create a clean project ID from hospital name (max 30 chars)
-base_id=$(echo "$hospital_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-\|-$//g')
-# Truncate to fit within 30 char limit, leaving room for timestamp
-max_base_length=$((30 - 10))  # 10 chars for timestamp
-if [ ${#base_id} -gt $max_base_length ]; then
-    base_id=$(echo "$base_id" | cut -c1-$max_base_length)
-fi
-timestamp=$(date +%s | tail -c 6)  # Use last 6 digits of timestamp
-project_id="${base_id}-${timestamp}"
+# 2) Ask hospital name → make a valid project id (<= 30 chars)
+read -rp "🏥 Enter your hospital name (e.g. 'Whiston Hospital'): " HOSPITAL
+[ -z "${HOSPITAL}" ] && { echo "❌ Hospital name is required."; exit 1; }
 
-echo ""
-echo "📋 Setup Summary:"
-echo "   Hospital: $hospital_name"
-echo "   Project ID: $project_id"
-echo ""
+BASE_ID=$(echo "$HOSPITAL" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g;s/-\+/-/g;s/^-//;s/-$//')
+MAX_BASE=$((30-7)) # leave 7 for suffix
+[ ${#BASE_ID} -gt $MAX_BASE ] && BASE_ID="${BASE_ID:0:$MAX_BASE}"
+SUFFIX=$(LC_ALL=C tr -dc a-z0-9 </dev/urandom | head -c 6)
+PROJECT_ID="${BASE_ID}-${SUFFIX}"
 
-# Confirm setup
-echo "Do you want to proceed with the setup? (y/N):"
-read -r confirm
+echo
+echo "📋 Summary:"
+echo "  Hospital   : $HOSPITAL"
+echo "  Project ID : $PROJECT_ID"
+read -rp "Proceed? (y/N): " OK; [[ ! "$OK" =~ ^[Yy]$ ]] && { echo "Cancelled."; exit 0; }
 
-if [[ ! $confirm =~ ^[Yy]$ ]]; then
-    echo "Setup cancelled."
-    exit 0
-fi
-
-echo ""
-echo "🔄 Starting setup process..."
-echo ""
-
-# Step 1: Create new project
-echo "1️⃣ Creating new Google Cloud project..."
-gcloud projects create "$project_id" --name="$hospital_name IMPACT System"
-
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to create project. Please check your permissions."
-    exit 1
-fi
-
-# Step 2: Set the project
-echo "2️⃣ Setting project as default..."
-gcloud config set project "$project_id"
-
-echo ""
-echo "💰 Billing Setup Required"
-echo "========================="
-echo "Your IMPACT system needs billing enabled for Cloud Functions."
-echo "Don't worry - this is just to verify your account."
-echo "You'll only be charged if you exceed free quotas (very unlikely)."
-echo ""
-
-# Step 3: Auto-open billing page and wait for setup
-echo "4️⃣ Opening billing setup page..."
-echo "Please complete these steps:"
-echo "1. Click 'Authorize' if prompted"
-echo "2. Click 'Link Billing Account'"
-echo "3. Select or create a billing account"
-echo "4. Click 'Continue'"
-echo ""
-
-# Open the billing page automatically
-billing_url="https://console.cloud.google.com/billing/projects/$project_id"
-echo "Opening: $billing_url"
-if command -v xdg-open &> /dev/null; then
-    xdg-open "$billing_url"
-elif command -v open &> /dev/null; then
-    open "$billing_url"
+# 3) Create project (idempotent-ish)
+echo "1️⃣  Creating project..."
+if gcloud projects describe "$PROJECT_ID" >/dev/null 2>&1; then
+  echo "ℹ️  Project already exists."
 else
-    echo "Please manually open: $billing_url"
+  gcloud projects create "$PROJECT_ID" --name="$HOSPITAL IMPACT System"
+fi
+gcloud config set project "$PROJECT_ID" >/dev/null
+
+# 4) Optional: billing auto-link (advanced users)
+read -rp "Have a Billing Account ID to auto-link? (leave blank to open the billing page): " BILLING
+if [ -n "${BILLING:-}" ]; then
+  echo "🔗 Linking billing account $BILLING..."
+  gcloud beta billing projects link "$PROJECT_ID" --billing-account="$BILLING" || true
 fi
 
-echo ""
-echo "⏳ Waiting for billing to be enabled..."
-echo "The script will continue automatically once billing is linked."
-echo ""
+# 5) If not linked, open billing page & poll until linked (required if NEED_FUNCTIONS=yes)
+if [ "$NEED_FUNCTIONS" = "yes" ]; then
+  echo
+  echo "💳 Cloud Functions require billing. We'll help you link it."
+  URL="https://console.cloud.google.com/billing/projects/$PROJECT_ID"
+  echo "Opening: $URL"
+  (command -v xdg-open >/dev/null && xdg-open "$URL") || (command -v open >/dev/null && open "$URL") || true
+  echo "⏳ Waiting for billing to be enabled (checks every 8s)..."
+  for i in {1..60}; do
+    LINKED=$(gcloud beta billing projects describe "$PROJECT_ID" --format="value(billingEnabled)" 2>/dev/null || echo "False")
+    [ "$LINKED" = "True" ] && { echo "✅ Billing enabled."; break; }
+    sleep 8
+    [ $i -eq 60 ] && { echo "❌ Billing not linked. Please link and re-run."; exit 1; }
+  done
+fi
 
-# Poll for billing status
-while true; do
-    billing_status=$(gcloud billing projects describe "$project_id" --format="value(billingAccountName)" 2>/dev/null)
-    if [ -n "$billing_status" ] && [ "$billing_status" != "" ]; then
-        echo "✅ Billing enabled successfully!"
-        break
-    fi
-    echo "⏳ Still waiting for billing setup... (checking every 10 seconds)"
-    sleep 10
-done
+# 6) Enable required APIs
+echo "2️⃣  Enabling APIs..."
+APIS=( firebase.googleapis.com firestore.googleapis.com firebasehosting.googleapis.com identitytoolkit.googleapis.com )
+if [ "$NEED_FUNCTIONS" = "yes" ]; then
+  APIS+=( cloudfunctions.googleapis.com cloudbuild.googleapis.com run.googleapis.com )
+fi
+gcloud services enable "${APIS[@]}" >/dev/null
 
-echo ""
+# 7) Add Firebase to the project (idempotent)
+echo "3️⃣  Adding Firebase to project..."
+firebase projects:addfirebase "$PROJECT_ID" >/dev/null || echo "ℹ️  Firebase already added."
 
-# Step 5: Enable required APIs
-echo "5️⃣ Enabling required APIs..."
-gcloud services enable firebase.googleapis.com
-gcloud services enable firestore.googleapis.com
-gcloud services enable firebasehosting.googleapis.com
-gcloud services enable identitytoolkit.googleapis.com
-gcloud services enable cloudfunctions.googleapis.com
-gcloud services enable cloudbuild.googleapis.com
+# 8) Create Firestore database (default) if missing
+echo "4️⃣  Ensuring Firestore database exists..."
+if gcloud firestore databases describe --database="(default)" >/dev/null 2>&1; then
+  echo "ℹ️  Firestore already exists."
+else
+  gcloud firestore databases create --region="$REGION" >/dev/null
+fi
 
-# Step 6: Initialize Firebase
-echo "6️⃣ Initializing Firebase..."
-firebase projects:addfirebase "$project_id"
+# 9) Create a Firebase Web App and get its config
+echo "5️⃣  Creating Firebase Web App & fetching config..."
+APP_JSON=$(firebase apps:create WEB "$HOSPITAL IMPACT" --project "$PROJECT_ID" --json 2>/dev/null || true)
+APP_ID=$(echo "$APP_JSON" | grep -o '"appId":"[^"]*' | cut -d'"' -f4 || true)
+if [ -z "$APP_ID" ]; then
+  # fall back: list existing web apps and take the first
+  APP_ID=$(firebase apps:list --project "$PROJECT_ID" --json | jq -r '.result[] | select(.platform=="WEB") | .appId' | head -n1)
+fi
+[ -z "$APP_ID" ] && { echo "❌ Could not obtain a Web App ID."; exit 1; }
+SDK_JSON=$(firebase apps:sdkconfig WEB "$APP_ID" --project "$PROJECT_ID" --json)
 
-# Step 7: Create Firestore database
-echo "7️⃣ Creating Firestore database..."
-gcloud firestore databases create --region=europe-west2 --project="$project_id"
+# 10) Write runtime config into build output
+echo "6️⃣  Writing runtime Firebase config..."
+mkdir -p "$BUILD_DIR/web-config"
+echo "$SDK_JSON" > "$BUILD_DIR/web-config/firebaseConfig.json"
 
-# Step 8: Create Firebase web app
-echo "8️⃣ Creating Firebase web app..."
-firebase apps:create WEB "$hospital_name IMPACT" --project="$project_id"
+# 11) Ensure firebase.json exists & points hosting to BUILD_DIR
+echo "7️⃣  Preparing firebase.json..."
+if [ ! -f firebase.json ]; then
+  cat > firebase.json <<JSON
+{
+  "hosting": {
+    "public": "$BUILD_DIR",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  }
+}
+JSON
+fi
 
-# Step 9: Get Firebase config
-echo "9️⃣ Getting Firebase configuration..."
-firebase_config=$(firebase apps:sdkconfig WEB --project="$project_id" --json)
-
-# Step 10: Create web-config directory and save config
-echo "🔟 Saving Firebase configuration..."
-mkdir -p web-config
-echo "$firebase_config" > web-config/firebaseConfig.json
-
-# Step 11: Install dependencies
-echo "1️⃣1️⃣ Installing dependencies..."
-npm install
-
-# Step 12: Build the application
-echo "1️⃣2️⃣ Building the application..."
+# 12) Build the app (static)
+echo "8️⃣  Installing deps & building app..."
+if [ -f package-lock.json ]; then npm ci; else npm install; fi
 npm run build
 
-# Step 13: Deploy to Firebase Hosting
-echo "1️⃣3️⃣ Deploying to Firebase Hosting..."
-firebase deploy --only hosting --project="$project_id"
-
-# Step 14: Get the live URL
-echo "1️⃣4️⃣ Getting your live URL..."
-live_url=$(firebase hosting:channel:list --project="$project_id" --json | jq -r '.result.channels[0].url // empty')
-
-if [ -z "$live_url" ]; then
-    live_url="https://$project_id.web.app"
+# 13) Deploy (hosting + optional functions)
+echo "9️⃣  Deploying to Firebase..."
+if [ "$NEED_FUNCTIONS" = "yes" ]; then
+  # optional: build functions first if your repo needs it
+  # (cd functions && npm ci && npm run build)
+  firebase deploy --only functions,hosting --project "$PROJECT_ID"
+else
+  firebase deploy --only hosting --project "$PROJECT_ID"
 fi
 
-echo ""
-echo "🎉 SETUP COMPLETE!"
-echo "=================="
-echo ""
-echo "🏥 Your IMPACT Course Management System is now live!"
-echo "🌐 Live URL: $live_url"
-echo ""
-echo "💳 Billing Information:"
-echo "• Billing enabled for Cloud Functions"
-echo "• Works within Google's free quotas"
-echo "• Only charged if you exceed free limits"
-echo ""
-echo "📋 Next Steps:"
-echo "1. Visit your live site: $live_url"
-echo "2. Complete the admin setup wizard"
-echo "3. Create your first admin account"
-echo "4. Add your hospital details"
-echo "5. Start creating IMPACT courses!"
-echo ""
-echo "📞 Need help? Contact: setup@impact-course.com"
-echo ""
-echo "✅ Setup completed successfully!"
+# 14) Show live URL
+LIVE_URL="https://${PROJECT_ID}.web.app"
+echo
+echo "🎉 Setup Complete!"
+echo "🌐 Your site: $LIVE_URL"
+echo "➡️  Open /setup to finish admin onboarding."
