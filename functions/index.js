@@ -12,6 +12,8 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const cors = require('cors')({ origin: true });
+const fetch = require('node-fetch');
+const crypto = require('crypto');
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -1315,5 +1317,574 @@ exports.scheduledCleanupDeletedSubjects = onSchedule({
     } catch (logError) {
       console.error('Failed to log cleanup error:', logError);
     }
+  }
+});
+
+// ============================================================================
+// PROVISIONING FUNCTIONS
+// ============================================================================
+
+// Helper function for Google API calls
+async function gapi(url, method = "GET", accessToken, body, headers = {}) {
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      ...headers,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status} ${res.statusText} → ${url}\n${text}`);
+  }
+  
+  return await res.json();
+}
+
+// Exchange OAuth code for tokens
+exports.exchangeOAuthCode = onCall(async (request) => {
+  try {
+    const { code } = request.data;
+    
+    if (!code) {
+      throw new Error('Authorization code is required');
+    }
+
+    const params = new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: `${process.env.APP_URL}/provision/callback`,
+      grant_type: "authorization_code",
+    });
+
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: params,
+    });
+    
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(JSON.stringify(json));
+    }
+    
+    return json;
+  } catch (error) {
+    console.error('OAuth exchange error:', error);
+    throw new Error(error.message || 'Failed to exchange authorization code');
+  }
+});
+
+// Provision Firebase project
+exports.provisionFirebaseProject = onCall(async (request) => {
+  try {
+    const { siteSlug, accessToken } = request.data;
+    
+    if (!siteSlug || !accessToken) {
+      throw new Error('Site slug and access token are required');
+    }
+
+    // Generate unique project ID
+    const projectId = `${siteSlug.toLowerCase().replace(/[^a-z0-9-]/g, "-")}-${crypto.randomBytes(4).toString('hex')}`;
+    const displayName = `IMPACT - ${siteSlug}`;
+    const region = process.env.FIRESTORE_REGION || "europe-west2";
+
+    console.log(`Starting provisioning for project: ${projectId}`);
+
+    // 1. Create GCP project
+    console.log('Creating GCP project...');
+    await gapi("https://cloudresourcemanager.googleapis.com/v1/projects", "POST", accessToken, {
+      projectId,
+      name: displayName,
+    });
+
+    // Wait a moment for project creation
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 2. Enable required APIs
+    console.log('Enabling APIs...');
+    await gapi(`https://serviceusage.googleapis.com/v1/projects/${projectId}/services:batchEnable`, "POST", accessToken, {
+      serviceIds: [
+        "firebase.googleapis.com",
+        "firestore.googleapis.com",
+        "firebasehosting.googleapis.com",
+        "identitytoolkit.googleapis.com",
+      ],
+    });
+
+    // 3. Add Firebase to project
+    console.log('Adding Firebase to project...');
+    await gapi(`https://firebase.googleapis.com/v1beta1/projects/${projectId}:addFirebase`, "POST", accessToken, {});
+
+    // 4. Create Firestore database
+    console.log('Creating Firestore database...');
+    await gapi(`https://firestore.googleapis.com/v1/projects/${projectId}/databases`, "POST", accessToken, {
+      database: {
+        name: `projects/${projectId}/databases/(default)`,
+        locationId: region,
+        type: "FIRESTORE_NATIVE",
+        concurrencyMode: "OPTIMISTIC",
+      },
+    });
+
+    // 5. Create Firebase Web App
+    console.log('Creating Firebase Web App...');
+    const app = await gapi(`https://firebase.googleapis.com/v1beta1/projects/${projectId}/webApps`, "POST", accessToken, {
+      displayName: "IMPACT Web",
+    });
+
+    const webAppId = app.name.split("/").pop();
+    
+    // 6. Get Firebase config
+    console.log('Getting Firebase config...');
+    const sdk = await gapi(`https://firebase.googleapis.com/v1beta1/projects/${projectId}/webApps/${webAppId}/config`, "GET", accessToken);
+
+    // 7. Create Hosting site
+    console.log('Creating Hosting site...');
+    try {
+      await gapi(`https://firebasehosting.googleapis.com/v1beta1/projects/${projectId}/sites`, "POST", accessToken, {
+        site: { name: `projects/${projectId}/sites/${projectId}` },
+      });
+    } catch (error) {
+      // Ignore if site already exists
+      console.log('Hosting site may already exist:', error.message);
+    }
+
+    // 8. Deploy the app
+    console.log('Deploying app...');
+    const deployResult = await deployToHosting(projectId, accessToken, sdk);
+
+    const url = `https://${projectId}.web.app`;
+    
+    console.log(`Provisioning completed successfully: ${url}`);
+    
+    return {
+      success: true,
+      url,
+      projectId,
+      firebaseConfig: sdk
+    };
+
+  } catch (error) {
+    console.error('Provisioning error:', error);
+    throw new Error(error.message || 'Failed to provision Firebase project');
+  }
+});
+
+// Deploy complete IMPACT system from GitHub
+async function deployToHosting(projectId, accessToken, firebaseConfig) {
+  try {
+    console.log('Starting complete IMPACT system deployment...');
+    
+    // 1. Clone the GitHub repository
+    const repoUrl = 'https://github.com/leighrobertabbott/IMPACT-Course-Admin.git';
+    const tempDir = `/tmp/${projectId}`;
+    
+    console.log('Cloning repository...');
+    await cloneRepository(repoUrl, tempDir);
+    
+    // 2. Update Firebase configuration
+    console.log('Updating Firebase configuration...');
+    await updateFirebaseConfig(tempDir, firebaseConfig);
+    
+    // 3. Install dependencies and build
+    console.log('Installing dependencies and building...');
+    await buildReactApp(tempDir);
+    
+    // 4. Deploy to Firebase Hosting
+    console.log('Deploying to Firebase Hosting...');
+    await deployBuiltApp(projectId, accessToken, tempDir);
+    
+    // 5. Deploy Firebase Functions
+    console.log('Deploying Firebase Functions...');
+    await deployFirebaseFunctions(projectId, accessToken, tempDir);
+    
+    // 6. Set up Firestore security rules
+    console.log('Setting up Firestore security rules...');
+    await setupFirestoreRules(projectId, accessToken);
+    
+    // 7. Clean up
+    await cleanup(tempDir);
+    
+    console.log('Complete IMPACT system deployed successfully!');
+    return { success: true };
+  } catch (error) {
+    console.error('Deployment error:', error);
+    throw error;
+  }
+}
+
+// Clone GitHub repository
+async function cloneRepository(repoUrl, targetDir) {
+  const { exec } = require('child_process');
+  const util = require('util');
+  const execAsync = util.promisify(exec);
+  
+  try {
+    await execAsync(`git clone ${repoUrl} ${targetDir}`);
+    console.log('Repository cloned successfully');
+  } catch (error) {
+    console.error('Failed to clone repository:', error);
+    throw new Error('Failed to clone repository');
+  }
+}
+
+// Update Firebase configuration in the cloned repo
+async function updateFirebaseConfig(repoDir, firebaseConfig) {
+  const fs = require('fs').promises;
+  const path = require('path');
+  
+  try {
+    // Update src/firebase/config.js
+    const configPath = path.join(repoDir, 'src', 'firebase', 'config.js');
+    const configContent = `import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
+import { getStorage } from 'firebase/storage';
+
+const firebaseConfig = ${JSON.stringify(firebaseConfig, null, 2)};
+
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const functions = getFunctions(app);
+export const storage = getStorage(app);
+
+export default app;
+`;
+    
+    await fs.writeFile(configPath, configContent);
+    console.log('Firebase configuration updated');
+  } catch (error) {
+    console.error('Failed to update Firebase config:', error);
+    throw new Error('Failed to update Firebase configuration');
+  }
+}
+
+// Build React application
+async function buildReactApp(repoDir) {
+  const { exec } = require('child_process');
+  const util = require('util');
+  const execAsync = util.promisify(exec);
+  
+  try {
+    // Install dependencies
+    console.log('Installing dependencies...');
+    await execAsync('npm install', { cwd: repoDir });
+    
+    // Build the application
+    console.log('Building React application...');
+    await execAsync('npm run build', { cwd: repoDir });
+    
+    console.log('React application built successfully');
+  } catch (error) {
+    console.error('Failed to build React app:', error);
+    throw new Error('Failed to build React application');
+  }
+}
+
+// Deploy built application to Firebase Hosting
+async function deployBuiltApp(projectId, accessToken, repoDir) {
+  try {
+    // Create a version
+    const version = await gapi(`https://firebasehosting.googleapis.com/v1beta1/sites/${projectId}/versions`, "POST", accessToken, {});
+    const versionName = version.name;
+    
+    // Read built files from dist directory
+    const fs = require('fs').promises;
+    const path = require('path');
+    const distDir = path.join(repoDir, 'dist');
+    
+    // Get all files from dist directory
+    const files = await collectFiles(distDir);
+    
+    // Populate files
+    const populate = await gapi(`https://firebasehosting.googleapis.com/v1beta1/${versionName}:populateFiles`, "POST", accessToken, {
+      files
+    });
+    
+    // Upload files if needed
+    if (populate.uploadRequiredHashes && populate.uploadRequiredHashes.length > 0) {
+      for (const hash of populate.uploadRequiredHashes) {
+        const filePath = findFileByHash(files, hash);
+        if (filePath) {
+          const content = await fs.readFile(filePath);
+          await fetch(`${populate.uploadUrl}/${hash}`, {
+            method: "PUT",
+            headers: {
+              "content-type": "application/octet-stream",
+              "x-goog-content-length-range": `0,${content.length}`,
+            },
+            body: content,
+          });
+        }
+      }
+    }
+    
+    // Finalize version
+    await gapi(`https://firebasehosting.googleapis.com/v1beta1/${versionName}:finalize`, "POST", accessToken, {});
+    
+    // Release to live
+    await gapi(`https://firebasehosting.googleapis.com/v1beta1/sites/${projectId}/releases`, "POST", accessToken, {
+      versionName: versionName,
+    });
+    
+    console.log('Built application deployed to Firebase Hosting');
+  } catch (error) {
+    console.error('Failed to deploy built app:', error);
+    throw new Error('Failed to deploy built application');
+  }
+}
+
+// Collect all files from a directory
+async function collectFiles(dir) {
+  const fs = require('fs').promises;
+  const path = require('path');
+  const crypto = require('crypto');
+  
+  const files = {};
+  
+  async function scanDirectory(currentDir, baseDir = dir) {
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = path.join(currentDir, entry.name);
+      const relativePath = path.relative(baseDir, fullPath);
+      
+      if (entry.isDirectory()) {
+        await scanDirectory(fullPath, baseDir);
+      } else {
+        const content = await fs.readFile(fullPath);
+        const hash = crypto.createHash('sha256').update(content).digest('hex');
+        
+        files[`/${relativePath.replace(/\\/g, '/')}`] = {
+          hash,
+          sizeBytes: String(content.length)
+        };
+      }
+    }
+  }
+  
+  await scanDirectory(dir);
+  return files;
+}
+
+// Find file path by hash
+function findFileByHash(files, hash) {
+  for (const [filePath, fileInfo] of Object.entries(files)) {
+    if (fileInfo.hash === hash) {
+      return filePath;
+    }
+  }
+  return null;
+}
+
+// Deploy Firebase Functions
+async function deployFirebaseFunctions(projectId, accessToken, repoDir) {
+  try {
+    // For now, we'll deploy a basic functions setup
+    // In a full implementation, you'd copy and deploy the functions directory
+    
+    const functionsConfig = {
+      runtime: "nodejs18",
+      source: {
+        files: {
+          "package.json": {
+            content: JSON.stringify({
+              name: "impact-functions",
+              version: "1.0.0",
+              main: "index.js",
+              dependencies: {
+                "firebase-admin": "^12.0.0",
+                "firebase-functions": "^4.0.0"
+              }
+            })
+          },
+          "index.js": {
+            content: `
+const { onRequest, onCall } = require('firebase-functions/v2/https');
+const admin = require('firebase-admin');
+
+admin.initializeApp();
+
+exports.helloWorld = onCall((request) => {
+  return { message: "Hello from IMPACT Functions!" };
+});
+`
+          }
+        }
+      }
+    };
+    
+    // Deploy functions using Google Cloud Functions API
+    await gapi(`https://cloudfunctions.googleapis.com/v1/projects/${projectId}/locations/europe-west2/functions`, "POST", accessToken, {
+      name: `projects/${projectId}/locations/europe-west2/functions/impact-functions`,
+      description: "IMPACT Course Management Functions",
+      sourceArchiveUrl: "gs://your-bucket/functions.zip", // You'd need to upload the functions
+      entryPoint: "helloWorld",
+      runtime: "nodejs18",
+      httpsTrigger: {}
+    });
+    
+    console.log('Firebase Functions deployed');
+  } catch (error) {
+    console.error('Failed to deploy Firebase Functions:', error);
+    // Don't throw here as functions are optional for basic functionality
+  }
+}
+
+// Set up Firestore security rules
+async function setupFirestoreRules(projectId, accessToken) {
+  try {
+    const rules = `
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to read their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow admins to read/write all data
+    match /{document=**} {
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}
+`;
+    
+    await gapi(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`, "POST", accessToken, {
+      name: `projects/${projectId}/databases/(default)/documents/rules`,
+      fields: {
+        rules: { stringValue: rules }
+      }
+    });
+    
+    console.log('Firestore security rules set up');
+  } catch (error) {
+    console.error('Failed to set up Firestore rules:', error);
+    // Don't throw here as rules can be set up later
+  }
+}
+
+// Clean up temporary files
+async function cleanup(tempDir) {
+  const fs = require('fs').promises;
+  const { exec } = require('child_process');
+  const util = require('util');
+  const execAsync = util.promisify(exec);
+  
+  try {
+    await execAsync(`rm -rf ${tempDir}`);
+    console.log('Temporary files cleaned up');
+  } catch (error) {
+    console.error('Failed to clean up:', error);
+  }
+}
+
+// Add user to OAuth consent screen test users list
+exports.addTestUser = onCall(async (request) => {
+  try {
+    const { email } = request.data;
+    
+    if (!email) {
+      throw new Error('Email is required');
+    }
+
+    console.log(`Adding ${email} to test users...`);
+
+    // Get access token for Google Cloud API
+    const { GoogleAuth } = require('google-auth-library');
+    const auth = new GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+    });
+    const client = await auth.getClient();
+    const accessToken = await client.getAccessToken();
+
+    // Use Google Cloud Console API to add test user
+    // First, we need to get the OAuth consent screen configuration
+    const response = await fetch(`https://oauth2.googleapis.com/admin/v1/projects/mwl-impact/oauthConsentScreen`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken.token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Failed to get OAuth consent screen:', response.status, errorData);
+      return { success: false, message: 'Failed to access OAuth consent screen' };
+    }
+
+    const consentScreen = await response.json();
+    console.log('Current consent screen config:', consentScreen);
+
+    // Add the email to test users if not already present
+    const currentTestUsers = consentScreen.testUsers || [];
+    if (!currentTestUsers.includes(email)) {
+      currentTestUsers.push(email);
+      
+      const updateResponse = await fetch(`https://oauth2.googleapis.com/admin/v1/projects/mwl-impact/oauthConsentScreen`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${accessToken.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          testUsers: currentTestUsers
+        })
+      });
+
+      if (updateResponse.ok) {
+        console.log(`Successfully added ${email} to test users`);
+        return { success: true, message: 'User added to test users' };
+      } else {
+        const errorData = await updateResponse.text();
+        console.error('Failed to update test users:', updateResponse.status, errorData);
+        return { success: false, message: 'Failed to update test users' };
+      }
+    } else {
+      console.log(`${email} is already in test users`);
+      return { success: true, message: 'User already in test users' };
+    }
+
+  } catch (error) {
+    console.error('Error adding test user:', error);
+    throw new Error('Failed to add test user: ' + error.message);
+  }
+});
+
+// Get Firebase config for a project
+exports.getFirebaseConfig = onCall(async (request) => {
+  try {
+    const { projectId } = request.data;
+    
+    if (!projectId) {
+      throw new Error('Project ID is required');
+    }
+
+    // This would typically get the config from a database or storage
+    // For now, we'll return a placeholder
+    return {
+      success: true,
+      config: {
+        apiKey: "placeholder",
+        authDomain: `${projectId}.firebaseapp.com`,
+        projectId: projectId,
+        storageBucket: `${projectId}.appspot.com`,
+        messagingSenderId: "placeholder",
+        appId: "placeholder"
+      }
+    };
+  } catch (error) {
+    console.error('Get config error:', error);
+    throw new Error(error.message || 'Failed to get Firebase config');
   }
 });

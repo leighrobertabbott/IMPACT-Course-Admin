@@ -68,6 +68,27 @@ const LandingPage = () => {
                 Login
               </Link>
             </div>
+            
+            {/* Get Your Own IMPACT System CTA */}
+            <div className="mt-8 pt-8 border-t border-white/20">
+              <div className="text-center mb-4">
+                <p className="text-white/90 text-lg mb-2">
+                  Want to run IMPACT courses at your hospital?
+                </p>
+                <p className="text-white/80 text-sm">
+                  Get your own IMPACT Management System in minutes
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <Link 
+                  to="/provision/start" 
+                  className="bg-nhs-green hover:bg-nhs-dark-green text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
+                >
+                  <span>Get your own IMPACT Management System</span>
+                  <ArrowRight size={20} />
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>

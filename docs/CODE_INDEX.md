@@ -41,6 +41,7 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 | `EnhancedProgrammeDisplay.jsx` | Programme visualization | Interactive programme display | Candidate dashboard | ✅ |
 | `FacultyManagementModal.jsx` | Faculty member management | Faculty CRUD operations | Admin panel | ✅ |
 | `ProspectusGenerator.jsx` | Course prospectus generation | PDF prospectus creation with course details | Admin panel, Course management | ✅ |
+| `LocationManagementModal.jsx` | Venue location management | Location CRUD with photo uploads and venue details | Admin panel | ✅ |
 
 ### Pages (`src/pages/`)
 
@@ -51,7 +52,7 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 | `ApplicationForm.jsx` | Candidate application form | Application submission | Public application process | ✅ |
 | `Login.jsx` | User authentication | Login/logout functionality | Authentication flow | ✅ |
 | `Dashboard.jsx` | Role-based dashboard | Personalized dashboard views with sidebar navigation | Authenticated user home | ✅ |
-| `AdminPanel.jsx` | Administrative interface | System administration tools | Admin users | ✅ |
+| `AdminPanel.jsx` | Administrative interface | System administration tools with location management | Admin users | ✅ |
 | `CourseManagement.jsx` | Course CRUD operations | Course lifecycle management | Admin users | ✅ |
 | `CandidateManagement.jsx` | Candidate data management | Candidate status and data with sidebar navigation | Admin/General Office | ✅ |
 | `GeneralOfficeView.jsx` | Payment and status management | Payment processing interface with sidebar navigation | General Office staff | ✅ |
@@ -59,6 +60,11 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 | `AssessmentManagement.jsx` | Assessment creation/tracking | Assessment lifecycle with sidebar navigation | Admin users | ✅ |
 | `Profile.jsx` | User profile management | Profile editing and photo upload | All authenticated users | ✅ |
 | `GeneralOfficeTutorial.jsx` | Staff training interface | Tutorial and guidance | General Office onboarding | ✅ |
+| `ProvisionStart.jsx` | OAuth initiation page | Google OAuth flow start | Provisioning system | ✅ |
+| `ProvisionCallback.jsx` | OAuth callback handler | OAuth response processing | Provisioning system | ✅ |
+| `ProvisionConfirm.jsx` | Site name collection | Site slug input and validation | Provisioning system | ✅ |
+| `ProvisionDone.jsx` | Success page | Live site URL and next steps | Provisioning system | ✅ |
+| `Setup.jsx` | First-run admin setup | Hospital and admin configuration | Deployed IMPACT sites | ✅ |
 
 ### Contexts (`src/contexts/`)
 
@@ -77,6 +83,8 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 | File | Purpose | Key Exports | Usage | Single Source of Truth |
 |------|---------|-------------|-------|------------------------|
 | `cloudFunctions.js` | Cloud Function wrappers | `cloudFunctions` object with error handling | Backend API calls | ✅ |
+| `google.js` | Google API helper functions | `gapi`, `exchangeCodeForTokens`, `randomId` | OAuth and Google Cloud API calls | ✅ |
+| `provisionApi.js` | Provisioning API functions | `provisionApi` object with OAuth and provisioning methods | Frontend provisioning flow | ✅ |
 
 ### Entry Points (`src/`)
 
@@ -89,7 +97,7 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 
 | File | Purpose | Key Exports | Usage | Single Source of Truth |
 |------|---------|-------------|-------|------------------------|
-| `index.js` | Cloud Functions implementation | All backend API endpoints | Serverless backend logic | ✅ |
+| `index.js` | Cloud Functions implementation | All backend API endpoints including provisioning functions | Serverless backend logic | ✅ |
 | `package.json` | Function dependencies | Node.js packages for functions | Backend dependencies | ✅ |
 
 ## Documentation (`Documentation/`)
@@ -122,6 +130,9 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 - **Cloud Functions**: `src/utils/cloudFunctions.js` - Frontend API call wrappers with error handling
 - **Error Handling**: `ErrorBoundary.jsx` - Global error catching and user-friendly error display
 - **Security**: `ProtectedRoute.jsx` - Role-based route protection and access control
+- **Location Management**: `LocationManagementModal.jsx` - Venue data management with photo uploads
+- **Prospectus Generation**: `ProspectusGenerator.jsx` - Dynamic PDF generation with location data
+- **Provisioning System**: `provisionApi.js` + Firebase Functions - Complete OAuth and Firebase project provisioning
 
 ### Data Flow Patterns
 1. **Authentication Flow**: Login → AuthContext → Protected Routes → Role-Based Redirects
@@ -129,6 +140,8 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 3. **API Communication**: Components → Cloud Functions → Firebase Services → Error Handling → User Feedback
 4. **State Management**: Context Providers → Component Consumption → Real-Time Updates
 5. **Error Handling**: ErrorBoundary → User-Friendly Messages → Recovery Options
+6. **Location Management**: Admin Panel → Location CRUD → Firebase Storage (photos) → Prospectus Generation
+7. **Prospectus Generation**: Course Selection → Location Data → Faculty Data → Programme Data → PDF Generation
 
 ### Security Patterns
 - **Route Protection**: `ProtectedRoute.jsx` enforces role-based access with automatic redirects
@@ -197,3 +210,9 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 - **`firestore.rules`** - Database access permissions with granular collection-level control
 - **`storage.rules`** - File upload permissions and validation
 - **`src/contexts/AuthContext.jsx`** - Centralized authentication state and user profile management
+
+### Location & Prospectus Management
+- **`src/components/LocationManagementModal.jsx`** - Venue data management with photo uploads and validation
+- **`src/components/ProspectusGenerator.jsx`** - Dynamic prospectus generation with location integration
+- **Firebase Storage** - Photo storage with access control and cleanup
+- **Firestore Collections** - `locations` collection for venue data management

@@ -1,0 +1,15 @@
+{
+  "application_name": "IMPACT Course Management System",
+  "support_email": "impact@sthk.nhs.uk",
+  "developer_contact_information": "impact@sthk.nhs.uk",
+  "authorized_domains": [
+    "mwl-impact.web.app"
+  ],
+  "scopes": [
+    "openid",
+    "email",
+    "profile",
+    "https://www.googleapis.com/auth/cloud-platform",
+    "https://www.googleapis.com/auth/firebase"
+  ]
+}

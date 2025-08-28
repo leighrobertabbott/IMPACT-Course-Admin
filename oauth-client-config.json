@@ -1,0 +1,8 @@
+{
+  "name": "IMPACT Provisioning Client",
+  "type": "web",
+  "redirect_uris": [
+    "https://mwl-impact.web.app/provision/callback",
+    "http://localhost:5173/provision/callback"
+  ]
+}

@@ -17,6 +17,12 @@ import CourseManagement from './pages/CourseManagement';
 import AssessmentManagement from './pages/AssessmentManagement';
 import Profile from './pages/Profile';
 import ProtectedRoute from './components/ProtectedRoute';
+import ProvisionStart from './pages/ProvisionStart';
+import ProvisionCallback from './pages/ProvisionCallback';
+import ProvisionConfirm from './pages/ProvisionConfirm';
+import ProvisionDone from './pages/ProvisionDone';
+import Setup from './pages/Setup';
+import OAuthErrorHandler from './components/OAuthErrorHandler';
 
 function App() {
   const { currentUser, userProfile } = useAuth();
@@ -31,6 +37,14 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/apply" element={<ApplicationForm />} />
           <Route path="/login" element={<Login />} />
+          
+          {/* Provisioning Routes */}
+          <Route path="/provision/start" element={<ProvisionStart />} />
+          <Route path="/provision/callback" element={<ProvisionCallback />} />
+          <Route path="/provision/confirm" element={<ProvisionConfirm />} />
+          <Route path="/provision/done" element={<ProvisionDone />} />
+          <Route path="/provision/error" element={<OAuthErrorHandler />} />
+          <Route path="/setup" element={<Setup />} />
           
           {/* Protected Routes - Wrapped with PhotoRequirement for candidates */}
           <Route 

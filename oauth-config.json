@@ -1,0 +1,25 @@
+{
+  "oauth": {
+    "clientId": "YOUR_OAUTH_CLIENT_ID",
+    "clientSecret": "YOUR_OAUTH_CLIENT_SECRET",
+    "redirectUris": [
+      "https://mwl-impact.web.app/provision/callback",
+      "http://localhost:5173/provision/callback"
+    ],
+    "scopes": [
+      "openid",
+      "email",
+      "profile",
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/firebase"
+    ]
+  },
+  "firebase": {
+    "projectId": "mwl-impact",
+    "region": "europe-west2"
+  },
+  "provisioning": {
+    "repository": "https://github.com/leighrobertabbott/IMPACT-Course-Admin.git",
+    "branch": "main"
+  }
+}
