@@ -73,8 +73,10 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
       // Faculty Bios
       generateFacultyBios(doc);
       
-      // Programme Schedule
-      generateProgrammeSchedule(doc);
+      // Programme Schedule (only if programme data exists)
+      if (programme.length > 0) {
+        generateProgrammeSchedule(doc);
+      }
       
       // Practical Information
       generatePracticalInfo(doc);
@@ -482,9 +484,19 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
             <div className="flex items-center justify-between mt-2">
               <span className="font-medium text-nhs-dark-grey">Programme Sessions:</span>
               <span className="text-nhs-blue font-semibold">
-                {programme.filter(item => !item.isWorkshopRotation).length}
+                {programme.length > 0 ? programme.filter(item => !item.isWorkshopRotation).length : 0}
               </span>
             </div>
+            {programme.length === 0 && (
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <span className="text-sm text-yellow-800">
+                    No programme data available. The prospectus will be generated without a detailed schedule.
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Generate Button */}
