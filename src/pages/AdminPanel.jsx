@@ -46,6 +46,7 @@ import EmailTemplateManager from '../components/EmailTemplateManager';
 import ProgrammeBuilderModal from '../components/ProgrammeBuilderModal';
 import FacultyManagementModal from '../components/FacultyManagementModal';
 import ProspectusGenerator from '../components/ProspectusGenerator';
+import LocationManagementModal from '../components/LocationManagementModal';
 
 const AdminPanel = () => {
   // Core state
@@ -90,6 +91,11 @@ const AdminPanel = () => {
   const [faculty, setFaculty] = useState([]);
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
   const [showProspectusGenerator, setShowProspectusGenerator] = useState(false);
+  
+  // Location management
+  const [locations, setLocations] = useState([]);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   
   // Materials management
   const [courseMaterials, setCourseMaterials] = useState([]);
@@ -177,6 +183,7 @@ const AdminPanel = () => {
     fetchAssessments();
     fetchEmailTemplates();
     fetchProgrammeTemplates();
+    fetchLocations();
   }, []);
 
   useEffect(() => {
@@ -1102,6 +1109,19 @@ const AdminPanel = () => {
     }
   };
 
+  const fetchLocations = async () => {
+    try {
+      const locationsSnapshot = await getDocs(collection(db, 'locations'));
+      const locationsData = locationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setLocations(locationsData);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+    }
+  };
+
 
 
   const loadProgrammeTemplate = async (templateId) => {
@@ -1599,6 +1619,7 @@ IMPACT @ Whiston Hospital`,
     { id: 'assessments', label: 'Assessments', icon: Award, color: 'text-nhs-pink' },
     { id: 'communications', label: 'Communications', icon: MessageSquare, color: 'text-nhs-teal' },
     { id: 'email-templates', label: 'Email Templates', icon: FileText, color: 'text-nhs-cyan' },
+    { id: 'locations', label: 'Location Management', icon: MapPin, color: 'text-nhs-brown' },
     { id: 'reports', label: 'Reports & Export', icon: BarChart3, color: 'text-nhs-gray' }
   ];
 
@@ -3138,6 +3159,81 @@ IMPACT @ Whiston Hospital`,
             </div>
           </div>
         );
+      case 'locations':
+        return (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Location Management</h3>
+              <button
+                onClick={() => {
+                  setSelectedLocation(null);
+                  setShowLocationModal(true);
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm flex items-center space-x-2"
+              >
+                <Plus size={16} />
+                <span>Add Location</span>
+              </button>
+            </div>
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <MapPin className="text-blue-600" size={16} />
+                <span className="font-medium text-blue-900">Venue Information</span>
+              </div>
+              <p className="text-blue-800 text-sm">
+                Manage venue details, contact information, directions, and photos for course prospectuses. This information will be used in generated prospectuses.
+              </p>
+            </div>
+            <p className="text-gray-600 mb-4">Create and manage venue locations with detailed information including directions, parking, facilities, and photos.</p>
+            
+            {locations.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {locations.map((location) => (
+                  <div key={location.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-semibold text-gray-900">{location.name}</h4>
+                      <button
+                        onClick={() => {
+                          setSelectedLocation(location);
+                          setShowLocationModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <Edit size={16} />
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">{location.address.street}, {location.address.city}</p>
+                    <div className="space-y-1 text-xs text-gray-500">
+                      <div>📞 {location.contact.phone || 'No phone'}</div>
+                      <div>📧 {location.contact.email || 'No email'}</div>
+                      <div>🚗 {location.parking.available ? 'Parking available' : 'No parking'}</div>
+                      <div>📶 {location.facilities.wifi ? 'WiFi' : 'No WiFi'}</div>
+                    </div>
+                    {location.photos && location.photos.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-xs text-gray-500">📷 {location.photos.length} photo(s)</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <MapPin className="mx-auto text-gray-400 mb-4" size={48} />
+                <p className="text-gray-500 mb-4">No locations found. Add your first venue location to get started.</p>
+                <button
+                  onClick={() => {
+                    setSelectedLocation(null);
+                    setShowLocationModal(true);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                >
+                  Add First Location
+                </button>
+              </div>
+            )}
+          </div>
+        );
       case 'templates':
         return renderTemplates();
       case 'reports':
@@ -4108,6 +4204,18 @@ IMPACT @ Whiston Hospital`,
         isOpen={showEmailTemplateManager} 
         onClose={() => setShowEmailTemplateManager(false)} 
       />
+
+      {/* Location Management Modal */}
+      {showLocationModal && (
+        <LocationManagementModal
+          onClose={() => {
+            setShowLocationModal(false);
+            setSelectedLocation(null);
+            fetchLocations();
+          }}
+          selectedLocation={selectedLocation}
+        />
+      )}
     </div>
   );
 };

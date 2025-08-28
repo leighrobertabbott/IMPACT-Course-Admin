@@ -10,11 +10,13 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [faculty, setFaculty] = useState([]);
   const [programme, setProgramme] = useState([]);
+  const [location, setLocation] = useState(null);
 
   useEffect(() => {
     if (selectedCourse) {
       fetchFaculty();
       fetchProgramme();
+      fetchLocation();
     }
   }, [selectedCourse]);
 
@@ -59,6 +61,87 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
       setProgramme(programmeData);
     } catch (error) {
       console.error('Error fetching programme:', error);
+    }
+  };
+
+  const fetchLocation = async () => {
+    try {
+      const locationsSnapshot = await getDocs(collection(db, 'locations'));
+      const locationsData = locationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Use the first location or create a default one
+      const defaultLocation = locationsData[0] || {
+        name: selectedCourse.venue || 'Course Venue',
+        address: {
+          street: 'Warrington Road',
+          city: 'Prescot',
+          postcode: 'L35 5DR',
+          country: 'UK'
+        },
+        contact: {
+          phone: '0151 426 1600',
+          email: 'impact@sthk.nhs.uk',
+          website: ''
+        },
+        directions: {
+          car: 'M62 Junction 6, follow signs for Whiston Hospital',
+          train: 'Nearest station is Prescot (1 mile away)',
+          bus: 'Routes 10, 10A, 10B, 10C from Liverpool'
+        },
+        parking: {
+          available: true,
+          cost: 'Free',
+          restrictions: 'None',
+          disabledAccess: true
+        },
+        facilities: {
+          wifi: true,
+          catering: true,
+          audioVisual: true,
+          accessibility: true
+        },
+        photos: []
+      };
+      
+      setLocation(defaultLocation);
+    } catch (error) {
+      console.error('Error fetching location:', error);
+      // Set default location if fetch fails
+      setLocation({
+        name: selectedCourse.venue || 'Course Venue',
+        address: {
+          street: 'Warrington Road',
+          city: 'Prescot',
+          postcode: 'L35 5DR',
+          country: 'UK'
+        },
+        contact: {
+          phone: '0151 426 1600',
+          email: 'impact@sthk.nhs.uk',
+          website: ''
+        },
+        directions: {
+          car: 'M62 Junction 6, follow signs for Whiston Hospital',
+          train: 'Nearest station is Prescot (1 mile away)',
+          bus: 'Routes 10, 10A, 10B, 10C from Liverpool'
+        },
+        parking: {
+          available: true,
+          cost: 'Free',
+          restrictions: 'None',
+          disabledAccess: true
+        },
+        facilities: {
+          wifi: true,
+          catering: true,
+          audioVisual: true,
+          accessibility: true
+        },
+        photos: []
+      });
     }
   };
 
@@ -191,6 +274,8 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
   };
 
   const generateVenueInfo = (doc) => {
+    if (!location) return;
+    
     doc.setTextColor(0, 0, 0);
     doc.setFillColor(240, 248, 255);
     doc.rect(0, 0, 210, 40, 'F');
@@ -203,18 +288,18 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
     // Venue details
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(selectedCourse.venue, 20, 50);
+    doc.text(location.name, 20, 50);
     
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     
     // Address
     const address = [
-      'Whiston Hospital',
-      'Warrington Road',
-      'Prescot',
-      'L35 5DR'
-    ];
+      location.address.street,
+      location.address.city,
+      location.address.postcode,
+      location.address.country
+    ].filter(line => line.trim());
     
     let yPos = 65;
     address.forEach(line => {
@@ -223,33 +308,73 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
     });
     
     // Contact information
-    yPos += 10;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Contact Information:', 20, yPos);
-    yPos += 8;
-    doc.setFont('helvetica', 'normal');
-    doc.text('Phone: 0151 426 1600', 20, yPos);
-    yPos += 6;
-    doc.text('Email: impact@sthk.nhs.uk', 20, yPos);
+    if (location.contact.phone || location.contact.email || location.contact.website) {
+      yPos += 10;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Contact Information:', 20, yPos);
+      yPos += 8;
+      doc.setFont('helvetica', 'normal');
+      
+      if (location.contact.phone) {
+        doc.text(`Phone: ${location.contact.phone}`, 20, yPos);
+        yPos += 6;
+      }
+      if (location.contact.email) {
+        doc.text(`Email: ${location.contact.email}`, 20, yPos);
+        yPos += 6;
+      }
+      if (location.contact.website) {
+        doc.text(`Website: ${location.contact.website}`, 20, yPos);
+        yPos += 6;
+      }
+    }
     
     // Directions
-    yPos += 15;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Getting Here:', 20, yPos);
-    yPos += 8;
-    doc.setFont('helvetica', 'normal');
+    if (location.directions.car || location.directions.train || location.directions.bus) {
+      yPos += 15;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Getting Here:', 20, yPos);
+      yPos += 8;
+      doc.setFont('helvetica', 'normal');
+      
+      const directions = [];
+      if (location.directions.car) directions.push(`By Car: ${location.directions.car}`);
+      if (location.directions.train) directions.push(`By Train: ${location.directions.train}`);
+      if (location.directions.bus) directions.push(`By Bus: ${location.directions.bus}`);
+      if (location.parking.available) {
+        const parkingInfo = `Parking: ${location.parking.cost || 'Available'}`;
+        if (location.parking.restrictions) {
+          directions.push(`${parkingInfo} (${location.parking.restrictions})`);
+        } else {
+          directions.push(parkingInfo);
+        }
+      }
+      
+      directions.forEach(direction => {
+        doc.text(direction, 20, yPos);
+        yPos += 6;
+      });
+    }
     
-    const directions = [
-      'By Car: M62 Junction 6, follow signs for Whiston Hospital',
-      'By Train: Nearest station is Prescot (1 mile away)',
-      'By Bus: Routes 10, 10A, 10B, 10C from Liverpool',
-      'Parking: Free parking available on site'
-    ];
-    
-    directions.forEach(direction => {
-      doc.text(direction, 20, yPos);
-      yPos += 6;
-    });
+    // Facilities
+    if (location.facilities.wifi || location.facilities.catering || location.facilities.audioVisual || location.facilities.accessibility) {
+      yPos += 15;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Available Facilities:', 20, yPos);
+      yPos += 8;
+      doc.setFont('helvetica', 'normal');
+      
+      const facilities = [];
+      if (location.facilities.wifi) facilities.push('WiFi available');
+      if (location.facilities.catering) facilities.push('Catering provided');
+      if (location.facilities.audioVisual) facilities.push('Audio/Visual equipment');
+      if (location.facilities.accessibility) facilities.push('Accessibility features');
+      
+      facilities.forEach(facility => {
+        doc.text(`• ${facility}`, 20, yPos);
+        yPos += 6;
+      });
+    }
     
     doc.addPage();
   };
@@ -374,10 +499,21 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
       ['Dress Code:', 'Smart casual'],
       ['What to Bring:', 'Pen, notebook, enthusiasm'],
       ['Certificates:', 'Awarded upon successful completion'],
-      ['CPD Points:', 'Available for this course'],
-      ['WiFi:', 'Available on site'],
-      ['Refreshments:', 'Tea and coffee provided']
+      ['CPD Points:', 'Available for this course']
     ];
+    
+    // Add location-specific information
+    if (location) {
+      if (location.facilities.wifi) {
+        practicalInfo.push(['WiFi:', 'Available on site']);
+      }
+      if (location.facilities.catering) {
+        practicalInfo.push(['Refreshments:', 'Tea and coffee provided']);
+      }
+      if (location.parking.available) {
+        practicalInfo.push(['Parking:', location.parking.cost || 'Available on site']);
+      }
+    }
     
     practicalInfo.forEach(([label, value]) => {
       doc.setFont('helvetica', 'bold');
@@ -388,14 +524,16 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
     });
     
     // Emergency contacts
-    yPos += 15;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Emergency Contacts:', 20, yPos);
-    yPos += 8;
-    doc.setFont('helvetica', 'normal');
-    doc.text('Course Coordinator: 0151 426 1600', 20, yPos);
-    yPos += 6;
-    doc.text('Hospital Switchboard: 0151 426 1600', 20, yPos);
+    if (location && location.contact.phone) {
+      yPos += 15;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Emergency Contacts:', 20, yPos);
+      yPos += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Course Coordinator: ${location.contact.phone}`, 20, yPos);
+      yPos += 6;
+      doc.text(`Hospital Switchboard: ${location.contact.phone}`, 20, yPos);
+    }
     
     // Footer
     yPos += 20;
