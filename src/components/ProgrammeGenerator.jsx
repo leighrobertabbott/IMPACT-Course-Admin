@@ -261,15 +261,11 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
               // Calculate actual time instead of generic slot
               const timeSlot = calculateTimeSlot(workshop.startTime, slotIndex, workshop.workshopDuration || 40);
               
-                             // Handle different group data structures
+                             // Handle standardized group data structures
                let groups = 'TBD';
-               if (schedule.groups && Array.isArray(schedule.groups)) {
-                 groups = schedule.groups.join(', ');
-               } else if (schedule.group) {
-                 groups = schedule.group;
-               } else if (schedule.assignedGroups && Array.isArray(schedule.assignedGroups)) {
-                 groups = schedule.assignedGroups.join(', ');
-               } else if (schedule.sessions && Array.isArray(schedule.sessions)) {
+               
+               // Check if this is a rotation schedule with sessions
+               if (schedule.sessions && Array.isArray(schedule.sessions)) {
                  // For sessions structure, coordinate groups across concurrent workshops
                  const rotation = schedule.rotation || 1;
                  const workshopKey = `${workshop.name}-${slotIndex}`;
@@ -306,6 +302,14 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
                  }
                  
                  groups = groupAssignments[workshopKey];
+               } else {
+                 // Direct group assignment from schedule
+                 if (schedule.groups && Array.isArray(schedule.groups)) {
+                   groups = schedule.groups.join(', ');
+                 } else if (schedule.group) {
+                   // Handle legacy format during transition
+                   groups = schedule.group;
+                 }
                }
               
               // Debug: Log what groups we found
@@ -345,7 +349,7 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
         if (assessment.timeSlots) {
           assessment.timeSlots.forEach((slot, slotIndex) => {
             // Use actual time from the time slot data
-            const timeSlot = slot.startTime || calculateTimeSlot(assessment.startTime, slotIndex, assessment.timeSlotDuration || 15);
+            const timeSlot = slot.startTime || calculateTimeSlot(assessment.startTime, slotIndex, slot.duration || 15);
             const groups = slot.groups ? slot.groups.join(', ') : 'TBD';
             html += `
                 <tr><td>${timeSlot}</td><td>Group ${groups}</td></tr>`;

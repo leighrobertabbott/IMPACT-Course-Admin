@@ -9,7 +9,7 @@ export const useProgrammeBuilder = (selectedCourse) => {
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
   const [subjectForm, setSubjectForm] = useState({
     name: '',
-    type: 'session', // session, workshop, practical, assessment, break, lunch, assessment, practical-session
+    type: 'session', // session, workshop, practical, assessment, break, lunch, practical-session, scenario-practice
     duration: 30,
     description: '',
     day: 1,
@@ -21,18 +21,22 @@ export const useProgrammeBuilder = (selectedCourse) => {
     workshopDuration: 40,
     numberOfRotations: 4,
     selectedWorkshopSubjects: [], // Array to store selected predefined workshop subjects
-    // Scenario practice and practical session fields
+    // Station-based fields (for practical sessions, assessments, scenario practice)
     numberOfStations: 4,
     numberOfTimeSlots: 4,
     timeSlotDuration: 30,
     stationNames: [],
-    // Concurrent activity fields for scenario practice
+    stationRooms: [], // Room assignments for stations
+    // Concurrent activity fields for assessments
     concurrentActivityName: '',
     scenarioCandidatesFirst: '',
     concurrentCandidatesFirst: '',
     scenarioCandidatesSecond: '',
     concurrentCandidatesSecond: '',
-    concurrentActivityFaculty: [] // Array to store faculty assigned to concurrent activities
+    concurrentActivityFaculty: [], // Array to store faculty assigned to concurrent activities
+    // Assessment-specific fields
+    timeSlots: [], // Generated time slots for assessments
+    stationAssignments: [] // Station-candidate assignments
   });
 
   // Predefined workshop subjects for rotation
@@ -40,7 +44,8 @@ export const useProgrammeBuilder = (selectedCourse) => {
     'Fluids and Transfusion',
     'Lumbar Puncture and CSF Analysis',
     'Advanced Arrhythmia Management',
-    'Imaging and Radiology'
+    'Imaging and Radiology',
+    'Poisoning Workshop'
   ];
 
   // Predefined session subjects for regular sessions
@@ -57,6 +62,7 @@ export const useProgrammeBuilder = (selectedCourse) => {
     'Neurological Emergencies',
     'Gastrointestinal Emergencies',
     'Sugar & Salt',
+    'Sepsis Structured Judgement Review',
     'Retests / Mentor Feedback',
     'Summary and Close',
     'Break',
@@ -83,56 +89,38 @@ export const useProgrammeBuilder = (selectedCourse) => {
     'Blood Gas Sampling'
   ];
 
-  // Function to get workshop groups for display
+  // Function to get workshop groups for display - standardized format
   const getWorkshopGroups = (subject) => {
-    if (!subject.isWorkshopRotation || !subject.rotationSequence || !subject.workshopIndex) {
+    if (!subject.isWorkshopRotation || !subject.rotationSchedule) {
       return null;
     }
 
-    const groups = ['A', 'B', 'C', 'D'];
-    const totalWorkshops = subject.totalWorkshops || 4;
-    const totalRotations = subject.totalRotations || 4;
+    const workshopGroups = new Set(); // Use Set to prevent duplicates
 
-    // Calculate which groups attend this specific workshop
-    const workshopGroups = [];
+    // Extract groups from standardized rotation schedule
+    subject.rotationSchedule.forEach(rotation => {
+      if (rotation.sessions) {
+        rotation.sessions.forEach(session => {
+          if (session.workshop === subject.name && session.groups) {
+            // Standardized format - always array
+            if (Array.isArray(session.groups)) {
+              session.groups.forEach(group => workshopGroups.add(group));
+            } else {
+              // Handle legacy string format during transition
+              const groups = session.groups.includes('+') 
+                ? session.groups.split('+') 
+                : [session.groups];
+              groups.forEach(group => workshopGroups.add(group.trim()));
+            }
+          }
+        });
+      }
+    });
 
-    for (let rotation = 1; rotation <= totalRotations; rotation++) {
-      const rotationSessions = subject.rotationSchedule?.find(r => r.rotation === rotation)?.sessions || [];
-
-      rotationSessions.forEach(session => {
-        if (session.workshop === subject.name) {
-          // Handle both individual groups and combined groups
-          if (session.groups) {
-            // New format with groups array
-            session.groups.forEach(group => {
-              if (!workshopGroups.includes(group)) {
-                workshopGroups.push(group);
-              }
-            });
-                     } else if (session.group) {
-             // Legacy format - check if it's a combined group
-             if (session.group.includes('+')) {
-               // Combined group format (e.g., "A+B")
-               session.group.split('+').forEach(group => {
-                 if (!workshopGroups.includes(group)) {
-                   workshopGroups.push(group);
-                 }
-               });
-             } else {
-               // Single group
-               if (!workshopGroups.includes(session.group)) {
-                 workshopGroups.push(session.group);
-               }
-             }
-           }
-        }
-      });
-    }
-
-    return workshopGroups.sort().join(', ');
+    return workshopGroups.size > 0 ? Array.from(workshopGroups).sort().join(', ') : null;
   };
 
-     // Function to get practical session groups for display
+     // Function to get practical session groups for display - standardized format
    const getPracticalSessionGroups = (subject) => {
      if (subject.type !== 'practical-session' || !subject.rotationSchedule) {
        return null;
@@ -141,21 +129,25 @@ export const useProgrammeBuilder = (selectedCourse) => {
     // Return a detailed breakdown of station assignments
     const stationAssignments = [];
     
-    subject.rotationSchedule.forEach(timeSlot => {
-      timeSlot.sessions.forEach(session => {
+    // Get first time slot for main display
+    const firstTimeSlot = subject.rotationSchedule[0];
+    if (firstTimeSlot && firstTimeSlot.sessions) {
+      firstTimeSlot.sessions.forEach(session => {
         if (session.station && session.groups) {
-          const groupsText = Array.isArray(session.groups) ? session.groups.join('+') : session.groups;
+          // Standardized group format handling
+          let groupsText;
+          if (Array.isArray(session.groups)) {
+            groupsText = session.groups.join('+');
+          } else {
+            // Handle legacy format during transition
+            groupsText = session.groups;
+          }
           stationAssignments.push(`${session.station}: ${groupsText}`);
         }
       });
-    });
-
-    // Return the first time slot assignments as the main display
-    if (stationAssignments.length > 0) {
-      return stationAssignments.slice(0, subject.numberOfStations || 2).join(' | ');
     }
 
-    return null;
+    return stationAssignments.length > 0 ? stationAssignments.join(' | ') : null;
   };
 
   // Utility function to calculate actual time slot times
@@ -327,7 +319,61 @@ export const useProgrammeBuilder = (selectedCourse) => {
      return errors;
    };
 
-   // Time conflict validation function
+   // Type-specific validation function
+   const validateSubjectTypeSpecific = (form, existingSubjects) => {
+     const errors = [];
+     
+     // Workshop rotation specific validation
+     if (form.type === 'workshop' && form.isWorkshopRotation) {
+       // Check for duplicate workshop subjects in same time slot
+       const conflictingWorkshops = existingSubjects.filter(subject => 
+         subject.type === 'workshop' && 
+         subject.isWorkshopRotation &&
+         subject.startTime === form.startTime &&
+         subject.endTime === form.endTime &&
+         subject.day === form.day &&
+         !subject.deleted
+       );
+       
+       if (conflictingWorkshops.length > 0) {
+         form.selectedWorkshopSubjects.forEach(newWorkshop => {
+           conflictingWorkshops.forEach(existing => {
+             if (existing.name === newWorkshop) {
+               errors.push(`Workshop "${newWorkshop}" already exists for this time slot`);
+             }
+           });
+         });
+       }
+     }
+     
+     // Assessment specific validation
+     if (form.type === 'assessment') {
+       // Check for multiple assessments on same day
+       const dayAssessments = existingSubjects.filter(subject => 
+         subject.type === 'assessment' && 
+         subject.day === form.day && 
+         !subject.deleted
+       );
+       
+       if (dayAssessments.length > 0) {
+         errors.push(`Only one assessment per day is recommended. Day ${form.day} already has an assessment.`);
+       }
+     }
+     
+     // Practical session specific validation
+     if (form.type === 'practical-session') {
+       // Validate station names are unique within the session
+       const stationNames = form.stationNames?.filter(name => name && name.trim() !== '') || [];
+       const uniqueNames = new Set(stationNames);
+       if (stationNames.length !== uniqueNames.size) {
+         errors.push('Station names must be unique within the practical session');
+       }
+     }
+     
+     return errors;
+   };
+
+   // Enhanced time conflict validation function
    const validateTimeConflicts = (newSubject, existingSubjects) => {
      const errors = [];
      
@@ -340,13 +386,21 @@ export const useProgrammeBuilder = (selectedCourse) => {
 
      // Check for conflicts with existing subjects on the same day
      existingSubjects.forEach(existingSubject => {
-       if (existingSubject.day === newSubject.day && existingSubject.id !== newSubject.id) {
+       if (existingSubject.day === newSubject.day && existingSubject.id !== newSubject.id && !existingSubject.deleted) {
          const existingStart = new Date(`2000-01-01T${existingSubject.startTime}`);
          const existingEnd = new Date(`2000-01-01T${existingSubject.endTime}`);
 
-         // Check for overlap
+         // Check for overlap (improved logic)
          if (newStart < existingEnd && newEnd > existingStart) {
-           errors.push(`Time conflict with "${existingSubject.name}" (${existingSubject.startTime} - ${existingSubject.endTime})`);
+           errors.push(`Time conflict with "${existingSubject.name}" (${existingSubject.startTime} - ${existingSubject.endTime}) on Day ${existingSubject.day}`);
+         }
+         
+         // Check for exact time matches (which should be allowed for concurrent workshops)
+         if (newStart.getTime() === existingStart.getTime() && newEnd.getTime() === existingEnd.getTime()) {
+           // Allow concurrent workshops but warn for other types
+           if (newSubject.type !== 'workshop' || existingSubject.type !== 'workshop') {
+             errors.push(`Exact time match with "${existingSubject.name}" - consider if this is intentional`);
+           }
          }
        }
      });
@@ -354,49 +408,105 @@ export const useProgrammeBuilder = (selectedCourse) => {
      return errors;
    };
 
-   // Function to generate assessment time slots with candidate assignments
-   const generateAssessmentTimeSlots = (assessmentForm) => {
-    const timeSlots = [];
-    const numberOfStations = assessmentForm.numberOfStations || 4;
-    const numberOfTimeSlots = assessmentForm.numberOfTimeSlots || 4;
-    const timeSlotDuration = assessmentForm.timeSlotDuration || 15;
-    const stationNames = assessmentForm.stationNames || [];
+     // Function to generate assessment time slots with specific candidate assignments (matches programme structure)
+  const generateAssessmentTimeSlots = (assessmentForm) => {
+   const timeSlots = [];
+   const numberOfStations = assessmentForm.numberOfStations || 4;
+   const numberOfTimeSlots = assessmentForm.numberOfTimeSlots || 4;
+   const leadAssistDuration = assessmentForm.leadAssistDuration || 20;
+   const assessedObserveDuration = assessmentForm.assessedObserveDuration || 15;
+   const stationNames = assessmentForm.stationNames || [];
 
-    for (let timeSlotIndex = 0; timeSlotIndex < numberOfTimeSlots; timeSlotIndex++) {
-      const slotStartTime = calculateTimeSlot(assessmentForm.startTime, timeSlotIndex, timeSlotDuration);
-      
-      const stations = [];
-      for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
-        // Calculate candidate assignments for this station and time slot
-        const candidatesPerStation = 2; // Lead and Assist roles
-        const startCandidate = (timeSlotIndex * numberOfStations * candidatesPerStation) + (stationIndex * candidatesPerStation) + 1;
-        const endCandidate = startCandidate + candidatesPerStation - 1;
-        
-        stations.push({
-          station: stationIndex + 1,
-          stationName: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
-          candidates: `${startCandidate}-${endCandidate}`,
-          roles: ['Lead', 'Assist'],
-          faculty: [] // Will be assigned later
-        });
-      }
+   // Assessment candidate assignment algorithm (matches IMPACT programme structure)
+   // First 2 time slots: Lead/Assist roles (20 min), Last 2 time slots: Assessed/Observe roles (15 min)
+   for (let timeSlotIndex = 0; timeSlotIndex < numberOfTimeSlots; timeSlotIndex++) {
+     const isFirstHalf = timeSlotIndex < 2; // First 2 slots are Lead/Assist, last 2 are Assessed/Observe
+     const currentSlotDuration = isFirstHalf ? leadAssistDuration : assessedObserveDuration;
+     
+     // Calculate start time based on previous slots' durations
+     let slotStartTime;
+     if (timeSlotIndex === 0) {
+       slotStartTime = assessmentForm.startTime;
+     } else {
+       // Calculate cumulative time from previous slots
+       let totalMinutes = 0;
+       for (let i = 0; i < timeSlotIndex; i++) {
+         const prevSlotDuration = i < 2 ? leadAssistDuration : assessedObserveDuration;
+         totalMinutes += prevSlotDuration;
+       }
+       slotStartTime = calculateTimeSlot(assessmentForm.startTime, 0, totalMinutes);
+     }
+     
+     const stations = [];
+     for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+       // Calculate specific candidate assignments based on IMPACT programme pattern
+       let candidate1, candidate2, role1, role2;
+       
+       if (isFirstHalf) {
+         // Time slots 1-2: Lead/Assist pattern
+         if (timeSlotIndex === 0) {
+           // First time slot: sequential assignment
+           candidate1 = (stationIndex * 2) + 1; // 1, 3, 5, 7
+           candidate2 = candidate1 + 1;          // 2, 4, 6, 8
+           role1 = 'Lead';
+           role2 = 'Assist';
+         } else {
+           // Second time slot: rotated assignment
+           candidate1 = ((stationIndex + 3) % 4 * 2) + 1; // 7, 1, 3, 5
+           candidate2 = candidate1 + 1;                    // 8, 2, 4, 6
+           role1 = 'Assist';
+           role2 = 'Lead';
+         }
+       } else {
+         // Time slots 3-4: Assessed/Observe pattern
+         if (timeSlotIndex === 2) {
+           // Third time slot: different assignment pattern
+           candidate1 = ((stationIndex + 2) % 4 * 2) + 1; // 5, 7, 1, 3
+           candidate2 = candidate1 + 1;                    // 6, 8, 2, 4
+           role1 = 'Assessed';
+           role2 = 'Observe';
+         } else {
+           // Fourth time slot: final rotation
+           candidate1 = ((stationIndex + 1) % 4 * 2) + 1; // 3, 5, 7, 1
+           candidate2 = candidate1 + 1;                    // 4, 6, 8, 2
+           role1 = 'Observe';
+           role2 = 'Assessed';
+         }
+       }
+       
+       stations.push({
+         station: stationIndex + 1,
+         stationName: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
+         candidateAssignments: [
+           { candidateNumber: candidate1, role: role1 },
+           { candidateNumber: candidate2, role: role2 }
+         ],
+         candidates: `Candidate ${candidate1}, Candidate ${candidate2}`, // For display
+         roles: [role1, role2],
+         faculty: [] // Will be assigned later
+       });
+     }
 
-      timeSlots.push({
-        slot: timeSlotIndex + 1,
-        startTime: slotStartTime,
-        stations: stations,
-        concurrentActivity: {
-          name: assessmentForm.concurrentActivityName || '',
-          candidates: assessmentForm.concurrentCandidatesFirst || '9-16',
-          duration: timeSlotDuration,
-          type: 'workshop',
-          faculty: assessmentForm.concurrentActivityFaculty || [] // Include faculty assignment for concurrent activities
-        }
-      });
-    }
+     // Determine concurrent activity candidates based on time slot
+     const concurrentCandidates = timeSlotIndex < 2 ? '9-16' : '1-8';
 
-    return timeSlots;
-  };
+     timeSlots.push({
+       slot: timeSlotIndex + 1,
+       startTime: slotStartTime,
+       duration: currentSlotDuration,
+       stations: stations,
+       concurrentActivity: {
+         name: assessmentForm.concurrentActivityName || '',
+         candidates: concurrentCandidates,
+         duration: currentSlotDuration,
+         type: 'workshop',
+         faculty: assessmentForm.concurrentActivityFaculty || []
+       }
+     });
+   }
+
+   return timeSlots;
+ };
 
   // Fetch programme subjects
   const fetchProgrammeSubjects = async () => {
@@ -435,6 +545,13 @@ export const useProgrammeBuilder = (selectedCourse) => {
          timeConflictErrors.forEach(error => toast.error(error));
          return;
        }
+       
+       // Additional validation for specific subject types
+       const typeSpecificErrors = validateSubjectTypeSpecific(subjectForm, programmeSubjects);
+       if (typeSpecificErrors.length > 0) {
+         typeSpecificErrors.forEach(error => toast.error(error));
+         return;
+       }
 
        if (!subjectForm.name || !subjectForm.type) {
          toast.error('Please fill in all required fields');
@@ -463,25 +580,25 @@ export const useProgrammeBuilder = (selectedCourse) => {
         // Track by workshop name only - groups shouldn't do the same workshop twice regardless of time
         existingWorkshopSubjects.forEach(subject => {
           if (subject.rotationSchedule) {
-            subject.rotationSchedule.forEach(schedule => {
-              // Handle both individual groups and combined groups
-              if (schedule.groups) {
-                // New format with groups array
-                schedule.groups.forEach(group => {
-                  groupProgress[group].add(subject.name);
+            subject.rotationSchedule.forEach(rotation => {
+              if (rotation.sessions) {
+                rotation.sessions.forEach(session => {
+                  // Standardized format - always use groups array
+                  if (session.groups && Array.isArray(session.groups)) {
+                    session.groups.forEach(group => {
+                      groupProgress[group].add(session.workshop || subject.name);
+                    });
+                  } else if (session.group) {
+                    // Legacy format conversion - convert to array
+                    const groups = session.group.includes('+') 
+                      ? session.group.split('+') 
+                      : [session.group];
+                    groups.forEach(group => {
+                      groupProgress[group.trim()].add(session.workshop || subject.name);
+                    });
+                  }
                 });
-                             } else if (schedule.group) {
-                 // Legacy format - check if it's a combined group
-                 if (schedule.group.includes('+')) {
-                   // Combined group format (e.g., "A+B")
-                   schedule.group.split('+').forEach(group => {
-                     groupProgress[group].add(subject.name);
-                   });
-                 } else {
-                   // Single group
-                   groupProgress[schedule.group].add(subject.name);
-                 }
-               }
+              }
             });
           }
         });
@@ -500,38 +617,67 @@ export const useProgrammeBuilder = (selectedCourse) => {
         const totalWorkshops = subjectForm.numberOfWorkshops;
         const totalRotations = subjectForm.numberOfRotations;
 
-        // Generate rotation schedule
+        // Generate rotation schedule with improved algorithm
         const rotationSchedule = [];
         const shouldCombineGroups = newWorkshopNames.length < groups.length;
+
+        // Validate workshop configuration
+        if (newWorkshopNames.length === 0) {
+          throw new Error('No workshop names selected');
+        }
+        
+        // Track group assignments to prevent conflicts
+        const groupAssignmentTracker = new Map();
 
         for (let rotation = 1; rotation <= totalRotations; rotation++) {
           const rotationSessions = [];
 
           if (shouldCombineGroups) {
-            // Calculate how many groups should be combined
+            // Calculate optimal group distribution
             const groupsPerWorkshop = Math.ceil(groups.length / newWorkshopNames.length);
 
             newWorkshopNames.forEach((workshop, workshopIndex) => {
               if (workshop.trim() !== '') {
-                const startGroupIndex = ((rotation - 1) * groupsPerWorkshop) % groups.length;
-                const endGroupIndex = Math.min(startGroupIndex + groupsPerWorkshop, groups.length);
-                const combinedGroups = groups.slice(startGroupIndex, endGroupIndex);
+                // Improved group assignment algorithm to prevent conflicts
+                const baseGroupIndex = ((rotation - 1) + workshopIndex) % groups.length;
+                const assignedGroups = [];
+                
+                for (let i = 0; i < groupsPerWorkshop && assignedGroups.length < groups.length; i++) {
+                  const groupIndex = (baseGroupIndex + i) % groups.length;
+                  const group = groups[groupIndex];
+                  
+                  // Check for conflicts in this rotation
+                  const assignmentKey = `${rotation}-${group}`;
+                  if (!groupAssignmentTracker.has(assignmentKey)) {
+                    assignedGroups.push(group);
+                    groupAssignmentTracker.set(assignmentKey, workshop);
+                  }
+                }
 
-                rotationSessions.push({
-                  workshop,
-                  groups: combinedGroups // New format with groups array
-                });
+                if (assignedGroups.length > 0) {
+                  rotationSessions.push({
+                    workshop,
+                    groups: assignedGroups // Standardized array format
+                  });
+                }
               }
             });
           } else {
-            // Standard rotation - one group per rotation
+            // Standard rotation - one group per workshop with proper rotation
             newWorkshopNames.forEach((workshop, workshopIndex) => {
               if (workshop.trim() !== '') {
                 const groupIndex = (workshopIndex + (rotation - 1)) % groups.length;
-                rotationSessions.push({
-                  workshop,
-                  groups: [groups[groupIndex]] // New format with groups array
-                });
+                const assignedGroup = groups[groupIndex];
+                
+                // Check for conflicts
+                const assignmentKey = `${rotation}-${assignedGroup}`;
+                if (!groupAssignmentTracker.has(assignmentKey)) {
+                  rotationSessions.push({
+                    workshop,
+                    groups: [assignedGroup] // Standardized array format
+                  });
+                  groupAssignmentTracker.set(assignmentKey, workshop);
+                }
               }
             });
           }
@@ -550,27 +696,23 @@ export const useProgrammeBuilder = (selectedCourse) => {
             name: workshopName,
             type: 'workshop',
             duration: subjectForm.workshopDuration,
-            description: `Workshop: ${workshopName}`,
+            description: subjectForm.description || `Workshop: ${workshopName}`,
             day: subjectForm.day,
             startTime: subjectForm.startTime,
             endTime: subjectForm.endTime,
             courseId: selectedCourse.id,
+            createdAt: new Date(),
+            // Workshop rotation specific fields
             isWorkshopRotation: true,
             workshopIndex: workshopIndex + 1,
             totalWorkshops: newWorkshopNames.length,
             totalRotations: totalRotations,
             rotationSchedule: rotationSchedule,
-            completedGroups: [],
-                         // Removed redundant boolean flags - using type field only
-            numberOfStations: 4,
-            numberOfTimeSlots: 4,
-            timeSlotDuration: 30,
-            stationNames: [],
-            concurrentActivityName: '',
-            scenarioCandidatesFirst: '',
-            concurrentCandidatesFirst: '',
-            scenarioCandidatesSecond: '',
-            concurrentCandidatesSecond: ''
+            selectedWorkshopSubjects: newWorkshopNames, // Store all workshop names for reference
+            // Initialize empty arrays for future assignments
+            assignedFaculty: [],
+            assignedMaterials: [],
+            completedGroups: []
           };
 
           await addDoc(collection(db, 'programmeSubjects'), subjectData);
@@ -589,66 +731,125 @@ export const useProgrammeBuilder = (selectedCourse) => {
         const numberOfStations = subjectForm.numberOfStations;
         const numberOfTimeSlots = subjectForm.numberOfTimeSlots;
 
-        // Generate rotation schedule for practical session
-        const rotationSchedule = [];
-
-        for (let timeSlot = 1; timeSlot <= numberOfTimeSlots; timeSlot++) {
-          const timeSlotSessions = [];
-          
-          // For each time slot, distribute groups across stations
-          for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
-            if (numberOfStations >= groups.length) {
-              // More stations than groups - one group per station, rotate
-              const groupIndex = (stationIndex + (timeSlot - 1)) % groups.length;
-              timeSlotSessions.push({
-                station: stationNames[stationIndex],
-                groups: [groups[groupIndex]]
-              });
-            } else {
-              // Fewer stations than groups - combine groups with proper rotation
-              const groupsPerStation = Math.ceil(groups.length / numberOfStations);
-              
-              // Calculate which groups should be at this station for this time slot
-              const assignedGroups = [];
-              
-              for (let i = 0; i < groupsPerStation; i++) {
-                const groupIndex = (stationIndex + (i * numberOfStations) + (timeSlot - 1)) % groups.length;
-                assignedGroups.push(groups[groupIndex]);
-              }
-              
-              timeSlotSessions.push({
-                station: stationNames[stationIndex],
-                groups: assignedGroups
-              });
-            }
-          }
-
-          rotationSchedule.push({
-            timeSlot,
-            sessions: timeSlotSessions
-          });
+        // Generate rotation schedule for practical session using Latin Square algorithm
+        // Validate configuration
+        if (numberOfStations < 1 || numberOfTimeSlots < 1) {
+          throw new Error('Invalid practical session configuration');
         }
+        
+        // Latin Square algorithm for proper rotation without conflicts
+        const generateLatinSquareRotation = () => {
+          const practicalRotationSchedule = [];
+          const assignments = new Map(); // Track assignments to prevent conflicts
+          
+          for (let timeSlot = 1; timeSlot <= numberOfTimeSlots; timeSlot++) {
+            const timeSlotSessions = [];
+            
+            for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+              const stationName = stationNames[stationIndex] || `Station ${stationIndex + 1}`;
+              
+              if (numberOfStations >= groups.length) {
+                // More stations than groups - proper rotation with Latin Square
+                const groupIndex = (stationIndex + (timeSlot - 1)) % groups.length;
+                const assignedGroup = groups[groupIndex];
+                
+                // Validate no conflicts
+                const key = `${timeSlot}-${assignedGroup}`;
+                if (!assignments.has(key)) {
+                  timeSlotSessions.push({
+                    station: stationName,
+                    groups: [assignedGroup]
+                  });
+                  assignments.set(key, stationName);
+                }
+              } else {
+                // Fewer stations than groups - use IMPACT programme pattern (A&B, C&D)
+                const groupsPerStation = Math.ceil(groups.length / numberOfStations);
+                
+                if (numberOfStations === 2 && groups.length === 4) {
+                  // Special case for 2 stations, 4 groups - use A&B, C&D pattern
+                  let assignedGroups;
+                  if (stationIndex === 0) {
+                    // Station 1 gets A&B for time slot 1, C&D for time slot 2, etc.
+                    assignedGroups = (timeSlot - 1) % 2 === 0 ? ['A', 'B'] : ['C', 'D'];
+                  } else {
+                    // Station 2 gets C&D for time slot 1, A&B for time slot 2, etc.
+                    assignedGroups = (timeSlot - 1) % 2 === 0 ? ['C', 'D'] : ['A', 'B'];
+                  }
+                  
+                  // Validate no conflicts
+                  const hasConflicts = assignedGroups.some(group => {
+                    const conflictKey = `${timeSlot}-${group}`;
+                    return assignments.has(conflictKey);
+                  });
+                  
+                  if (!hasConflicts) {
+                    assignedGroups.forEach(group => {
+                      assignments.set(`${timeSlot}-${group}`, stationName);
+                    });
+                    
+                    timeSlotSessions.push({
+                      station: stationName,
+                      groups: assignedGroups
+                    });
+                  }
+                } else {
+                  // General Latin Square algorithm for other configurations
+                  const assignedGroups = [];
+                  
+                  for (let i = 0; i < groupsPerStation && assignedGroups.length < groups.length; i++) {
+                    const groupIndex = (stationIndex + (timeSlot - 1) + (i * numberOfStations)) % groups.length;
+                    const group = groups[groupIndex];
+                    
+                    const conflictKey = `${timeSlot}-${group}`;
+                    if (!assignments.has(conflictKey) && !assignedGroups.includes(group)) {
+                      assignedGroups.push(group);
+                      assignments.set(conflictKey, stationName);
+                    }
+                  }
+                  
+                  if (assignedGroups.length > 0) {
+                    timeSlotSessions.push({
+                      station: stationName,
+                      groups: assignedGroups
+                    });
+                  }
+                }
+              }
+            }
+
+            practicalRotationSchedule.push({
+              timeSlot,
+              sessions: timeSlotSessions
+            });
+          }
+          
+          return practicalRotationSchedule;
+        };
+        
+        const rotationSchedule = generateLatinSquareRotation();
 
         const subjectData = {
-          ...subjectForm,
+          name: subjectForm.name,
+          type: subjectForm.type,
+          duration: subjectForm.duration,
+          description: subjectForm.description,
+          day: subjectForm.day,
+          startTime: subjectForm.startTime,
+          endTime: subjectForm.endTime,
           courseId: selectedCourse.id,
-          isWorkshopRotation: false,
-          rotationSequence: null,
-          workshopIndex: null,
-          totalWorkshops: null,
-          totalRotations: null,
-          rotationSchedule: rotationSchedule,
-          completedGroups: [],
-                     // Removed redundant boolean flags - using type field only
+          createdAt: new Date(),
+          // Practical session specific fields
           numberOfStations: subjectForm.numberOfStations,
           numberOfTimeSlots: subjectForm.numberOfTimeSlots,
           timeSlotDuration: subjectForm.timeSlotDuration,
           stationNames: subjectForm.stationNames,
-          concurrentActivityName: '',
-          scenarioCandidatesFirst: '',
-          concurrentCandidatesFirst: '',
-          scenarioCandidatesSecond: '',
-          concurrentCandidatesSecond: ''
+          stationRooms: subjectForm.stationRooms || [],
+          rotationSchedule: rotationSchedule,
+          // Initialize empty arrays for future assignments
+          assignedFaculty: [],
+          assignedMaterials: [],
+          stationFaculty: Array(subjectForm.numberOfStations).fill([]) // Faculty assignments per station
         };
 
         await addDoc(collection(db, 'programmeSubjects'), subjectData);
@@ -669,45 +870,27 @@ export const useProgrammeBuilder = (selectedCourse) => {
          // Generate assessment time slots with concurrent activities
          const timeSlots = generateAssessmentTimeSlots(subjectForm);
          
-         // Add concurrent activity information to each time slot
-         const updatedTimeSlots = timeSlots.map(timeSlot => ({
-           ...timeSlot,
-           concurrentActivity: {
-             name: subjectForm.concurrentActivityName,
-             candidates: subjectForm.concurrentCandidatesFirst || '9-16', // Default to candidates 9-16
-             duration: subjectForm.timeSlotDuration,
-             type: 'workshop' // or 'lecture' based on activity
-           }
-         }));
+         // Add concurrent activity information to each time slot with proper candidate rotation
+         const updatedTimeSlots = timeSlots.map((timeSlot, index) => {
+           // Alternate candidate groups for concurrent activities
+           const isFirstHalf = index < Math.floor(timeSlots.length / 2);
+           const concurrentCandidates = isFirstHalf 
+             ? (subjectForm.concurrentCandidatesFirst || '9-16')
+             : (subjectForm.concurrentCandidatesSecond || '1-8');
+           
+           return {
+             ...timeSlot,
+             concurrentActivity: {
+               name: subjectForm.concurrentActivityName,
+               candidates: concurrentCandidates,
+               duration: subjectForm.timeSlotDuration,
+               type: 'workshop', // Could be configurable in future
+               faculty: subjectForm.concurrentActivityFaculty || []
+             }
+           };
+         });
          
-         const subjectData = {
-           ...subjectForm,
-           courseId: selectedCourse.id,
-           isWorkshopRotation: false,
-           rotationSequence: null,
-           workshopIndex: null,
-           totalWorkshops: null,
-           totalRotations: null,
-           rotationSchedule: null,
-           completedGroups: [],
-                      // Removed redundant boolean flags - using type field only
-           numberOfStations: subjectForm.numberOfStations,
-           numberOfTimeSlots: subjectForm.numberOfTimeSlots,
-           timeSlotDuration: subjectForm.timeSlotDuration,
-           stationNames: subjectForm.stationNames,
-           timeSlots: updatedTimeSlots,
-           concurrentActivityName: subjectForm.concurrentActivityName || '',
-           scenarioCandidatesFirst: subjectForm.scenarioCandidatesFirst || '',
-           concurrentCandidatesFirst: subjectForm.concurrentCandidatesFirst || '',
-           scenarioCandidatesSecond: subjectForm.scenarioCandidatesSecond || '',
-           concurrentCandidatesSecond: subjectForm.concurrentCandidatesSecond || ''
-         };
-
-         await addDoc(collection(db, 'programmeSubjects'), subjectData);
-         toast.success('Assessment session with concurrent activities added successfully');
-      } else {
-        // Handle regular subjects (non-workshop rotation, non-practical session, non-assessment)
-        const subjectData = {
+                 const subjectData = {
           ...subjectForm,
           courseId: selectedCourse.id,
           isWorkshopRotation: false,
@@ -717,23 +900,67 @@ export const useProgrammeBuilder = (selectedCourse) => {
           totalRotations: null,
           rotationSchedule: null,
           completedGroups: [],
-                     // Removed redundant boolean flags - using type field only
-          numberOfStations: 4,
-          numberOfTimeSlots: 4,
-          timeSlotDuration: 30,
-          stationNames: [],
-          concurrentActivityName: '',
-          scenarioCandidatesFirst: '',
-          concurrentCandidatesFirst: '',
-          scenarioCandidatesSecond: '',
-          concurrentCandidatesSecond: ''
+          // Assessment-specific data structure
+          numberOfStations: subjectForm.numberOfStations,
+          numberOfTimeSlots: subjectForm.numberOfTimeSlots,
+          timeSlotDuration: subjectForm.timeSlotDuration,
+          stationNames: subjectForm.stationNames,
+          timeSlots: updatedTimeSlots,
+          stationAssignments: updatedTimeSlots.map(timeSlot => ({
+            timeSlot: timeSlot.slot,
+            startTime: timeSlot.startTime,
+            stations: timeSlot.stations.map(station => ({
+              stationId: station.station,
+              stationName: station.stationName,
+              assignedCandidates: station.candidates,
+              candidateRoles: station.roles,
+              assignedFaculty: [] // Will be populated when faculty are assigned
+            })),
+            concurrentActivity: timeSlot.concurrentActivity
+          })),
+          concurrentActivityName: subjectForm.concurrentActivityName || '',
+          scenarioCandidatesFirst: subjectForm.scenarioCandidatesFirst || '',
+          concurrentCandidatesFirst: subjectForm.concurrentCandidatesFirst || '',
+          scenarioCandidatesSecond: subjectForm.scenarioCandidatesSecond || '',
+          concurrentCandidatesSecond: subjectForm.concurrentCandidatesSecond || '',
+          // Assessment metadata
+          assessmentType: 'station-based',
+          maxCandidatesPerTimeSlot: subjectForm.numberOfStations * 2, // 2 candidates per station
+          totalAssessmentSlots: subjectForm.numberOfTimeSlots * subjectForm.numberOfStations
+        };
+
+         await addDoc(collection(db, 'programmeSubjects'), subjectData);
+         toast.success('Assessment session with concurrent activities added successfully');
+      } else {
+        // Handle regular subjects (sessions, breaks, lunch, scenario-practice)
+        const subjectData = {
+          name: subjectForm.name,
+          type: subjectForm.type,
+          duration: subjectForm.duration,
+          description: subjectForm.description,
+          day: subjectForm.day,
+          startTime: subjectForm.startTime,
+          endTime: subjectForm.endTime,
+          courseId: selectedCourse.id,
+          createdAt: new Date(),
+          // Initialize empty arrays for future assignments
+          assignedFaculty: [],
+          assignedMaterials: [],
+          // Only include station fields for scenario-practice type
+          ...(subjectForm.type === 'scenario-practice' && {
+            numberOfStations: subjectForm.numberOfStations || 4,
+            numberOfTimeSlots: subjectForm.numberOfTimeSlots || 4,
+            timeSlotDuration: subjectForm.timeSlotDuration || 30,
+            stationRooms: subjectForm.stationRooms || [],
+            stationFaculty: [] // Will be populated when faculty are assigned
+          })
         };
 
         await addDoc(collection(db, 'programmeSubjects'), subjectData);
         toast.success('Subject added to programme successfully');
       }
 
-      // Reset form
+      // Reset form with all fields
       setSubjectForm({
         name: '',
         type: 'session',
@@ -751,11 +978,15 @@ export const useProgrammeBuilder = (selectedCourse) => {
         numberOfTimeSlots: 4,
         timeSlotDuration: 30,
         stationNames: [],
+        stationRooms: [],
         concurrentActivityName: '',
         scenarioCandidatesFirst: '',
         concurrentCandidatesFirst: '',
         scenarioCandidatesSecond: '',
-        concurrentCandidatesSecond: ''
+        concurrentCandidatesSecond: '',
+        concurrentActivityFaculty: [],
+        timeSlots: [],
+        stationAssignments: []
       });
       fetchProgrammeSubjects();
     } catch (error) {
@@ -801,11 +1032,15 @@ export const useProgrammeBuilder = (selectedCourse) => {
       numberOfTimeSlots: subject.numberOfTimeSlots || 4,
       timeSlotDuration: subject.timeSlotDuration || 30,
       stationNames: subject.stationNames || [],
+      stationRooms: subject.stationRooms || [],
       concurrentActivityName: subject.concurrentActivityName || '',
       scenarioCandidatesFirst: subject.scenarioCandidatesFirst || '',
       concurrentCandidatesFirst: subject.concurrentCandidatesFirst || '',
       scenarioCandidatesSecond: subject.scenarioCandidatesSecond || '',
-      concurrentCandidatesSecond: subject.concurrentCandidatesSecond || ''
+      concurrentCandidatesSecond: subject.concurrentCandidatesSecond || '',
+      concurrentActivityFaculty: subject.concurrentActivityFaculty || [],
+      timeSlots: subject.timeSlots || [],
+      stationAssignments: subject.stationAssignments || []
     });
   };
 
@@ -826,7 +1061,7 @@ export const useProgrammeBuilder = (selectedCourse) => {
       await updateDoc(doc(db, 'programmeSubjects', subjectId), updateData);
       toast.success('Subject updated successfully');
 
-      // Reset form
+      // Reset form with all fields
       setSubjectForm({
         name: '',
         type: 'session',
@@ -844,11 +1079,15 @@ export const useProgrammeBuilder = (selectedCourse) => {
         numberOfTimeSlots: 4,
         timeSlotDuration: 30,
         stationNames: [],
+        stationRooms: [],
         concurrentActivityName: '',
         scenarioCandidatesFirst: '',
         concurrentCandidatesFirst: '',
         scenarioCandidatesSecond: '',
-        concurrentCandidatesSecond: ''
+        concurrentCandidatesSecond: '',
+        concurrentActivityFaculty: [],
+        timeSlots: [],
+        stationAssignments: []
       });
       fetchProgrammeSubjects();
     } catch (error) {
@@ -871,30 +1110,44 @@ export const useProgrammeBuilder = (selectedCourse) => {
     );
   };
 
-  // Get candidate assignments for a specific assessment subject (with concurrent activities)
+  // Get candidate assignments for a specific assessment subject (with specific candidate assignments)
   const getCandidateAssignments = (assessmentSubject) => {
     if (!assessmentSubject.timeSlots) return [];
     
     const assignments = [];
     assessmentSubject.timeSlots.forEach(timeSlot => {
-      // Assessment station assignments
+      // Assessment station assignments - using specific candidate assignments
       timeSlot.stations.forEach(station => {
-        const candidateRange = station.candidates;
-        if (candidateRange) {
-          const [start, end] = candidateRange.split('-').map(Number);
-          // For assessment rotation: candidates take turns being assessed and assisting
-          for (let i = start; i <= end; i++) {
-            // First candidate in pair is assessed, second assists
-            const isAssessed = (i - start) % 2 === 0;
+        if (station.candidateAssignments) {
+          // New format with specific candidate assignments
+          station.candidateAssignments.forEach(assignment => {
             assignments.push({
-              candidateNumber: i,
+              candidateNumber: assignment.candidateNumber,
               timeSlot: timeSlot.slot,
               station: station.station,
               stationName: station.stationName,
-              role: isAssessed ? 'Assessed' : 'Assist',
+              role: assignment.role,
               activityType: 'assessment',
               faculty: station.faculty || []
             });
+          });
+        } else if (station.candidates) {
+          // Legacy format fallback
+          const candidateRange = station.candidates;
+          if (candidateRange.includes('-')) {
+            const [start, end] = candidateRange.split('-').map(Number);
+            for (let i = start; i <= end; i++) {
+              const isAssessed = (i - start) % 2 === 0;
+              assignments.push({
+                candidateNumber: i,
+                timeSlot: timeSlot.slot,
+                station: station.station,
+                stationName: station.stationName,
+                role: isAssessed ? 'Assessed' : 'Assist',
+                activityType: 'assessment',
+                faculty: station.faculty || []
+              });
+            }
           }
         }
       });
@@ -911,7 +1164,7 @@ export const useProgrammeBuilder = (selectedCourse) => {
               activityName: timeSlot.concurrentActivity.name,
               activityType: 'concurrent',
               role: 'Participant',
-              faculty: []
+              faculty: timeSlot.concurrentActivity.faculty || []
             });
           }
         }
@@ -1104,15 +1357,20 @@ export const useProgrammeBuilder = (selectedCourse) => {
     predefinedSessionSubjects,
     predefinedPracticalSubjects,
 
-    // Functions
+    // Core Functions
     fetchProgrammeSubjects,
     addProgrammeSubject,
     deleteProgrammeSubject,
     editProgrammeSubject,
     updateProgrammeSubject,
+    
+    // Display Functions
     getWorkshopGroups,
     getPracticalSessionGroups,
     getPracticalSessionStationInfo,
+    calculateTimeSlot,
+    
+    // Assessment Functions
     generateAssessmentTimeSlots,
     getAssessmentSubjects,
     getCandidateAssignments,
@@ -1121,6 +1379,11 @@ export const useProgrammeBuilder = (selectedCourse) => {
     getStationAssessments,
     updateAssessmentCompletion,
     getCandidatePairs,
-    getConcurrentActivitySchedule
+    getConcurrentActivitySchedule,
+    
+    // Validation Functions
+    validateSubjectForm,
+    validateTimeConflicts,
+    validateSubjectTypeSpecific
   };
 };

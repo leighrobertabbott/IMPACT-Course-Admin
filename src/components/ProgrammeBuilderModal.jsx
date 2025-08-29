@@ -11,7 +11,8 @@ const ProgrammeBuilderModal = ({
     'Fluids and Transfusion',
     'Lumbar Puncture and CSF Analysis',
     'Advanced Arrhythmia Management',
-    'Imaging and Radiology'
+    'Imaging and Radiology',
+    'Poisoning Workshop'
   ],
   predefinedSessionSubjects = [
     'Registration / Meeting for Faculty',
@@ -26,6 +27,7 @@ const ProgrammeBuilderModal = ({
     'Neurological Emergencies',
     'Gastrointestinal Emergencies',
     'Sugar & Salt',
+    'Sepsis Structured Judgement Review',
     'Retests / Mentor Feedback',
     'Summary and Close',
     'Break',
@@ -154,24 +156,41 @@ const ProgrammeBuilderModal = ({
           const groupIndex = (stationIndex + (timeSlot - 1)) % groups.length;
           timeSlotSessions.push({
             station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
-            groups: groups[groupIndex]
+            groups: [groups[groupIndex]] // Standardized array format
           });
         } else {
-          // Fewer stations than groups - combine groups with proper rotation
+          // Fewer stations than groups - use IMPACT programme pattern (A&B, C&D)
           const groupsPerStation = Math.ceil(groups.length / numberOfStations);
           
-          // Calculate which groups should be at this station for this time slot
-          const assignedGroups = [];
-          
-          for (let i = 0; i < groupsPerStation; i++) {
-            const groupIndex = (stationIndex + (i * numberOfStations) + (timeSlot - 1)) % groups.length;
-            assignedGroups.push(groups[groupIndex]);
+          if (numberOfStations === 2 && groups.length === 4) {
+            // Special case for 2 stations, 4 groups - use A&B, C&D pattern
+            let assignedGroups;
+            if (stationIndex === 0) {
+              // Station 1 gets A&B for time slot 1, C&D for time slot 2, etc.
+              assignedGroups = (timeSlot - 1) % 2 === 0 ? ['A', 'B'] : ['C', 'D'];
+            } else {
+              // Station 2 gets C&D for time slot 1, A&B for time slot 2, etc.
+              assignedGroups = (timeSlot - 1) % 2 === 0 ? ['C', 'D'] : ['A', 'B'];
+            }
+            
+            timeSlotSessions.push({
+              station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
+              groups: assignedGroups
+            });
+          } else {
+            // General algorithm for other configurations
+            const assignedGroups = [];
+            
+            for (let i = 0; i < groupsPerStation; i++) {
+              const groupIndex = (stationIndex + (i * numberOfStations) + (timeSlot - 1)) % groups.length;
+              assignedGroups.push(groups[groupIndex]);
+            }
+            
+            timeSlotSessions.push({
+              station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
+              groups: assignedGroups
+            });
           }
-          
-          timeSlotSessions.push({
-            station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
-            groups: assignedGroups.join('+')
-          });
         }
       }
 
@@ -184,35 +203,84 @@ const ProgrammeBuilderModal = ({
     return schedule;
   };
 
-  // Function to generate assessment time slots with candidate assignments
+  // Function to generate assessment time slots with specific candidate assignments (matches programme structure)
   const generateAssessmentTimeSlots = (assessmentForm) => {
     const timeSlots = [];
     const numberOfStations = assessmentForm.numberOfStations || 4;
     const numberOfTimeSlots = assessmentForm.numberOfTimeSlots || 4;
-    const timeSlotDuration = assessmentForm.timeSlotDuration || 15;
+    const leadAssistDuration = assessmentForm.leadAssistDuration || 20;
+    const assessedObserveDuration = assessmentForm.assessedObserveDuration || 15;
     const stationNames = assessmentForm.stationNames || [];
 
+    // Assessment candidate assignment algorithm (matches IMPACT programme structure)
+    // First 2 time slots: Lead/Assist roles (20 min), Last 2 time slots: Assessed/Observe roles (15 min)
     for (let timeSlotIndex = 0; timeSlotIndex < numberOfTimeSlots; timeSlotIndex++) {
-      const slotStartTime = calculateTimeSlot(assessmentForm.startTime, timeSlotIndex, timeSlotDuration);
+      const isFirstHalf = timeSlotIndex < 2; // First 2 slots are Lead/Assist, last 2 are Assessed/Observe
+      const currentSlotDuration = isFirstHalf ? leadAssistDuration : assessedObserveDuration;
+      
+      // Calculate start time based on previous slots' durations
+      let slotStartTime;
+      if (timeSlotIndex === 0) {
+        slotStartTime = assessmentForm.startTime;
+      } else {
+        // Calculate cumulative time from previous slots
+        let totalMinutes = 0;
+        for (let i = 0; i < timeSlotIndex; i++) {
+          const prevSlotDuration = i < 2 ? leadAssistDuration : assessedObserveDuration;
+          totalMinutes += prevSlotDuration;
+        }
+        slotStartTime = calculateTimeSlot(assessmentForm.startTime, 0, totalMinutes);
+      }
       
       const stations = [];
       for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
-        // Calculate candidate assignments for this station and time slot
-        const candidatesPerStation = 2; // Lead and Assist roles
-        const startCandidate = (timeSlotIndex * numberOfStations * candidatesPerStation) + (stationIndex * candidatesPerStation) + 1;
-        const endCandidate = startCandidate + candidatesPerStation - 1;
+        // Calculate specific candidate assignments based on IMPACT programme pattern
+        let candidate1, candidate2, role1, role2;
+        
+        if (isFirstHalf) {
+          // Time slots 1-2: Lead/Assist pattern
+          if (timeSlotIndex === 0) {
+            candidate1 = (stationIndex * 2) + 1; // 1, 3, 5, 7
+            candidate2 = candidate1 + 1;          // 2, 4, 6, 8
+            role1 = 'Lead';
+            role2 = 'Assist';
+          } else {
+            candidate1 = ((stationIndex + 3) % 4 * 2) + 1; // 7, 1, 3, 5
+            candidate2 = candidate1 + 1;                    // 8, 2, 4, 6
+            role1 = 'Assist';
+            role2 = 'Lead';
+          }
+        } else {
+          // Time slots 3-4: Assessed/Observe pattern
+          if (timeSlotIndex === 2) {
+            candidate1 = ((stationIndex + 2) % 4 * 2) + 1; // 5, 7, 1, 3
+            candidate2 = candidate1 + 1;                    // 6, 8, 2, 4
+            role1 = 'Assessed';
+            role2 = 'Observe';
+          } else {
+            candidate1 = ((stationIndex + 1) % 4 * 2) + 1; // 3, 5, 7, 1
+            candidate2 = candidate1 + 1;                    // 4, 6, 8, 2
+            role1 = 'Observe';
+            role2 = 'Assessed';
+          }
+        }
         
         stations.push({
           station: stationIndex + 1,
           stationName: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
-          candidates: `${startCandidate}-${endCandidate}`,
-          roles: ['Lead', 'Assist']
+          candidateAssignments: [
+            { candidateNumber: candidate1, role: role1 },
+            { candidateNumber: candidate2, role: role2 }
+          ],
+          candidates: `Candidate ${candidate1}, Candidate ${candidate2}`,
+          roles: [role1, role2]
         });
       }
 
       timeSlots.push({
         slot: timeSlotIndex + 1,
         startTime: slotStartTime,
+        duration: currentSlotDuration,
         stations: stations
       });
     }
@@ -564,19 +632,45 @@ const ProgrammeBuilderModal = ({
                   <option value={2}>2 Time Slots</option>
                 </select>
               </div>
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
-                  Time Slot Duration (minutes)
+                  Assessment Time Slot Durations
                 </label>
-                <select
-                  value={subjectForm.timeSlotDuration || 15}
-                  onChange={(e) => setSubjectForm(prev => ({ ...prev, timeSlotDuration: parseInt(e.target.value) }))}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value={15}>15 minutes</option>
-                  <option value={20}>20 minutes</option>
-                  <option value={30}>30 minutes</option>
-                </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-nhs-grey mb-1">
+                      Lead/Assist Slots (first 2 slots)
+                    </label>
+                    <select
+                      value={subjectForm.leadAssistDuration || 20}
+                      onChange={(e) => setSubjectForm(prev => ({ ...prev, leadAssistDuration: parseInt(e.target.value) }))}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    >
+                      <option value={15}>15 minutes</option>
+                      <option value={20}>20 minutes</option>
+                      <option value={25}>25 minutes</option>
+                      <option value={30}>30 minutes</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-nhs-grey mb-1">
+                      Assessed/Observe Slots (last 2 slots)
+                    </label>
+                    <select
+                      value={subjectForm.assessedObserveDuration || 15}
+                      onChange={(e) => setSubjectForm(prev => ({ ...prev, assessedObserveDuration: parseInt(e.target.value) }))}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    >
+                      <option value={10}>10 minutes</option>
+                      <option value={15}>15 minutes</option>
+                      <option value={20}>20 minutes</option>
+                      <option value={25}>25 minutes</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-nhs-grey mt-2">
+                  Lead/Assist slots are longer for practice, Assessed/Observe slots are shorter for evaluation
+                </p>
               </div>
               
               {/* Station Names Configuration */}
@@ -694,9 +788,19 @@ const ProgrammeBuilderModal = ({
                           <div className="md:col-span-1">
                             <h5 className="font-medium text-nhs-blue mb-2">Assessment Stations:</h5>
                             {timeSlot.stations.map((station, stationIndex) => (
-                              <div key={stationIndex} className="flex justify-between items-center bg-white p-2 rounded border mb-2">
-                                <span className="text-nhs-dark-grey">{station.stationName}</span>
-                                <span className="bg-purple-500 text-white px-2 py-1 rounded text-xs">Candidates {station.candidates}</span>
+                              <div key={stationIndex} className="bg-white p-3 rounded border mb-2">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-nhs-dark-grey">{station.stationName}</span>
+                                  <span className="bg-purple-500 text-white px-2 py-1 rounded text-xs">Station {station.station}</span>
+                                </div>
+                                <div className="space-y-1 text-xs">
+                                  {station.candidateAssignments?.map((assignment, idx) => (
+                                    <div key={idx} className="flex justify-between">
+                                      <span className="text-gray-600">{assignment.role}:</span>
+                                      <span className="font-medium">Candidate {assignment.candidateNumber}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -723,7 +827,14 @@ const ProgrammeBuilderModal = ({
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
                   <p className="text-sm text-purple-800">
                     <strong>Assessment Setup:</strong> This will create an assessment session with {subjectForm.numberOfStations || 4} stations 
-                    and {subjectForm.numberOfTimeSlots || 4} time slots of {subjectForm.timeSlotDuration || 15} minutes each. 
+                    and {subjectForm.numberOfTimeSlots || 4} time slots. 
+                    <br /><br />
+                    <strong>Time Slot Durations:</strong>
+                    <br />
+                    • Time Slots 1-2: Lead/Assist roles ({subjectForm.leadAssistDuration || 20} minutes each)
+                    <br />
+                    • Time Slots 3-4: Assessed/Observe roles ({subjectForm.assessedObserveDuration || 15} minutes each)
+                    <br /><br />
                     Candidates will be assigned Lead/Assist roles in the first two time slots and Assessed/Observe roles in the remaining slots.
                     {subjectForm.concurrentActivityName && (
                       <>
@@ -793,7 +904,7 @@ const ProgrammeBuilderModal = ({
                 </select>
               </div>
               
-              {/* Room Assignment for Each Station */}
+                             {/* Room Assignment for Each Station */}
                <div className="md:col-span-2">
                  <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
                    Room Assignment for Each Station
@@ -809,7 +920,7 @@ const ProgrammeBuilderModal = ({
                            type="text"
                            value={subjectForm.stationRooms?.[index] || ''}
                            onChange={(e) => {
-                             const newStationRooms = [...(subjectForm.stationRooms || [])];
+                             const newStationRooms = [...(subjectForm.stationRooms || Array(subjectForm.numberOfStations).fill(''))];
                              newStationRooms[index] = e.target.value;
                              setSubjectForm(prev => ({ ...prev, stationRooms: newStationRooms }));
                            }}
@@ -949,7 +1060,9 @@ const ProgrammeBuilderModal = ({
                           {timeSlot.sessions.map((session, sessionIndex) => (
                             <div key={sessionIndex} className="flex justify-between items-center bg-white p-2 rounded border">
                               <span className="text-nhs-dark-grey">{session.station}</span>
-                                                             <span className="bg-indigo-500 text-white px-2 py-1 rounded text-xs">Group {Array.isArray(session.groups) ? session.groups.join('+') : session.groups}</span>
+                                                             <span className="bg-indigo-500 text-white px-2 py-1 rounded text-xs">
+                                Group {Array.isArray(session.groups) ? session.groups.join('+') : session.groups}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -983,8 +1096,16 @@ const ProgrammeBuilderModal = ({
         </div>
         <div className="flex space-x-3 mt-6">
           <button
-            onClick={onAddSubject}
-            className="bg-nhs-blue text-white px-4 py-2 rounded-md hover:bg-nhs-dark-blue"
+            onClick={() => {
+              try {
+                onAddSubject();
+              } catch (error) {
+                console.error('Error adding subject:', error);
+                // Error will be handled by the hook function
+              }
+            }}
+            className="bg-nhs-blue text-white px-4 py-2 rounded-md hover:bg-nhs-dark-blue disabled:opacity-50"
+            disabled={!subjectForm.name || !subjectForm.type}
           >
             Add Subject
           </button>
