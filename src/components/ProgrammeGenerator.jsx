@@ -230,15 +230,19 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
       }
     };
 
-         // Generate workshop rotation schedule with actual times
-     const generateWorkshopSchedule = (workshops) => {
+              // Generate workshop rotation schedule with actual times
+      const generateWorkshopSchedule = (workshops, startTime) => {
        if (!workshops || workshops.length === 0) return '';
        
        // Debug: Log workshop data structure
        console.log('Workshop data for generation:', workshops);
        
-       let html = '';
-       workshops.forEach((workshop, index) => {
+               let html = '';
+        
+        // Coordinate group assignments across concurrent workshops
+        const groupAssignments = {};
+        
+        workshops.forEach((workshop, index) => {
          html += `
            <div class="tile">
              <h5>${workshop.name}</h5>
@@ -257,26 +261,52 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
               // Calculate actual time instead of generic slot
               const timeSlot = calculateTimeSlot(workshop.startTime, slotIndex, workshop.workshopDuration || 40);
               
-              // Handle different group data structures
-              let groups = 'TBD';
-              if (schedule.groups && Array.isArray(schedule.groups)) {
-                groups = schedule.groups.join(', ');
-              } else if (schedule.group) {
-                groups = schedule.group;
-              } else if (schedule.assignedGroups && Array.isArray(schedule.assignedGroups)) {
-                groups = schedule.assignedGroups.join(', ');
-              } else if (schedule.sessions && Array.isArray(schedule.sessions)) {
-                // For sessions structure, just use rotation number directly
-                // This avoids the duplicate group issue
-                const rotation = schedule.rotation || 1;
-                if (rotation === 1) {
-                  groups = 'A, B';
-                } else if (rotation === 2) {
-                  groups = 'C, D';
-                } else {
-                  groups = 'TBD';
-                }
-              }
+                             // Handle different group data structures
+               let groups = 'TBD';
+               if (schedule.groups && Array.isArray(schedule.groups)) {
+                 groups = schedule.groups.join(', ');
+               } else if (schedule.group) {
+                 groups = schedule.group;
+               } else if (schedule.assignedGroups && Array.isArray(schedule.assignedGroups)) {
+                 groups = schedule.assignedGroups.join(', ');
+               } else if (schedule.sessions && Array.isArray(schedule.sessions)) {
+                 // For sessions structure, coordinate groups across concurrent workshops
+                 const rotation = schedule.rotation || 1;
+                 const workshopKey = `${workshop.name}-${slotIndex}`;
+                 
+                 if (!groupAssignments[workshopKey]) {
+                   // Assign groups based on workshop index and rotation
+                   if (workshops.length === 2) {
+                     // Two concurrent workshops
+                     if (index === 0) {
+                       // First workshop gets A, B for rotation 1, C, D for rotation 2
+                       if (rotation === 1) {
+                         groupAssignments[workshopKey] = 'A, B';
+                       } else {
+                         groupAssignments[workshopKey] = 'C, D';
+                       }
+                     } else {
+                       // Second workshop gets C, D for rotation 1, A, B for rotation 2
+                       if (rotation === 1) {
+                         groupAssignments[workshopKey] = 'C, D';
+                       } else {
+                         groupAssignments[workshopKey] = 'A, B';
+                       }
+                     }
+                   } else {
+                     // Single workshop or more than 2 - use original logic
+                     if (rotation === 1) {
+                       groupAssignments[workshopKey] = 'A, B';
+                     } else if (rotation === 2) {
+                       groupAssignments[workshopKey] = 'C, D';
+                     } else {
+                       groupAssignments[workshopKey] = 'TBD';
+                     }
+                   }
+                 }
+                 
+                 groups = groupAssignments[workshopKey];
+               }
               
               // Debug: Log what groups we found
               console.log(`Groups for slot ${slotIndex}:`, groups);
@@ -402,12 +432,12 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
              tableOpen = false;
            }
            
-           // Generate workshop blocks that visually interrupt the schedule
-           html += `
-           <!-- Workshop Blocks -->
-           <div class="two-grid" style="margin:6mm 0">
-             ${generateWorkshopSchedule(session.workshops)}
-           </div>`;
+                     // Generate workshop blocks that visually interrupt the schedule
+            html += `
+            <!-- Workshop Blocks -->
+            <div class="two-grid" style="margin:6mm 0">
+              ${generateWorkshopSchedule(session.workshops, session.startTime)}
+            </div>`;
            
          } else {
            // Regular session - ensure table is open
