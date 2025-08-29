@@ -50,6 +50,36 @@ const ProgrammeBuilderModal = ({
     'Blood Gas Sampling'
   ]
 }) => {
+  // Utility function to calculate actual time slot times
+  const calculateTimeSlot = (startTime, slotIndex, slotDuration) => {
+    if (!startTime || !slotDuration) {
+      return `Time Slot ${slotIndex + 1}`;
+    }
+
+    try {
+      // Parse start time (assuming format like "09:00" or "9:00")
+      const [hours, minutes] = startTime.split(':').map(Number);
+      const startDate = new Date();
+      startDate.setHours(hours, minutes, 0, 0);
+
+      // Calculate slot start time
+      const slotStartTime = new Date(startDate.getTime() + (slotIndex * slotDuration * 60 * 1000));
+      
+      // Calculate slot end time
+      const slotEndTime = new Date(slotStartTime.getTime() + (slotDuration * 60 * 1000));
+
+      // Format times as HH:MM
+      const formatTime = (date) => {
+        return date.toTimeString().slice(0, 5);
+      };
+
+      return `${formatTime(slotStartTime)} - ${formatTime(slotEndTime)}`;
+    } catch (error) {
+      console.error('Error calculating time slot:', error);
+      return `Time Slot ${slotIndex + 1}`;
+    }
+  };
+
   const generateRotationSchedule = () => {
     if (!subjectForm.isWorkshopRotation || !subjectForm.selectedWorkshopSubjects || subjectForm.selectedWorkshopSubjects.length === 0) {
       return [];
@@ -77,7 +107,7 @@ const ProgrammeBuilderModal = ({
             
             rotationSessions.push({
               workshop,
-              group: combinedGroups.join('+') // Combine groups with '+'
+              groups: combinedGroups // Use array format consistently
             });
           }
         });
@@ -88,7 +118,7 @@ const ProgrammeBuilderModal = ({
             const groupIndex = (workshopIndex + (rotation - 1)) % groups.length;
             rotationSessions.push({
               workshop,
-              group: groups[groupIndex]
+              groups: [groups[groupIndex]] // Use array format consistently
             });
           }
         });
@@ -119,7 +149,6 @@ const ProgrammeBuilderModal = ({
       
       // For each time slot, distribute groups across stations
       for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
-        // Calculate which group(s) go to this station
         if (numberOfStations >= groups.length) {
           // More stations than groups - one group per station, rotate
           const groupIndex = (stationIndex + (timeSlot - 1)) % groups.length;
@@ -128,23 +157,20 @@ const ProgrammeBuilderModal = ({
             groups: groups[groupIndex]
           });
         } else {
-          // Fewer stations than groups - combine groups
+          // Fewer stations than groups - combine groups with proper rotation
           const groupsPerStation = Math.ceil(groups.length / numberOfStations);
-          const startGroupIndex = stationIndex * groupsPerStation;
-          const endGroupIndex = Math.min(startGroupIndex + groupsPerStation, groups.length);
           
-          // Get the base groups for this station
-          const baseGroups = groups.slice(startGroupIndex, endGroupIndex);
+          // Calculate which groups should be at this station for this time slot
+          const assignedGroups = [];
           
-          // Rotate the groups for this time slot
-          const rotatedGroups = baseGroups.map((_, index) => {
-            const rotatedIndex = (startGroupIndex + index + (timeSlot - 1)) % groups.length;
-            return groups[rotatedIndex];
-          });
+          for (let i = 0; i < groupsPerStation; i++) {
+            const groupIndex = (stationIndex + (i * numberOfStations) + (timeSlot - 1)) % groups.length;
+            assignedGroups.push(groups[groupIndex]);
+          }
           
           timeSlotSessions.push({
             station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
-            groups: rotatedGroups.join('+')
+            groups: assignedGroups.join('+')
           });
         }
       }
@@ -156,6 +182,42 @@ const ProgrammeBuilderModal = ({
     }
 
     return schedule;
+  };
+
+  // Function to generate assessment time slots with candidate assignments
+  const generateAssessmentTimeSlots = (assessmentForm) => {
+    const timeSlots = [];
+    const numberOfStations = assessmentForm.numberOfStations || 4;
+    const numberOfTimeSlots = assessmentForm.numberOfTimeSlots || 4;
+    const timeSlotDuration = assessmentForm.timeSlotDuration || 15;
+    const stationNames = assessmentForm.stationNames || [];
+
+    for (let timeSlotIndex = 0; timeSlotIndex < numberOfTimeSlots; timeSlotIndex++) {
+      const slotStartTime = calculateTimeSlot(assessmentForm.startTime, timeSlotIndex, timeSlotDuration);
+      
+      const stations = [];
+      for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+        // Calculate candidate assignments for this station and time slot
+        const candidatesPerStation = 2; // Lead and Assist roles
+        const startCandidate = (timeSlotIndex * numberOfStations * candidatesPerStation) + (stationIndex * candidatesPerStation) + 1;
+        const endCandidate = startCandidate + candidatesPerStation - 1;
+        
+        stations.push({
+          station: stationIndex + 1,
+          stationName: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
+          candidates: `${startCandidate}-${endCandidate}`,
+          roles: ['Lead', 'Assist']
+        });
+      }
+
+      timeSlots.push({
+        slot: timeSlotIndex + 1,
+        startTime: slotStartTime,
+        stations: stations
+      });
+    }
+
+    return timeSlots;
   };
 
   if (!isOpen) return null;
@@ -446,7 +508,7 @@ const ProgrammeBuilderModal = ({
                               {rotation.sessions.map((session, sessionIndex) => (
                                 <div key={sessionIndex} className="flex justify-between items-center bg-white p-2 rounded border">
                                   <span className="text-nhs-dark-grey">{session.workshop}</span>
-                                  <span className="bg-nhs-blue text-white px-2 py-1 rounded text-xs">Group {session.group}</span>
+                                  <span className="bg-nhs-blue text-white px-2 py-1 rounded text-xs">Group {Array.isArray(session.groups) ? session.groups.join('+') : session.groups}</span>
                                 </div>
                               ))}
                             </div>
@@ -517,10 +579,37 @@ const ProgrammeBuilderModal = ({
                 </select>
               </div>
               
+              {/* Station Names Configuration */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                  Assessment Station Names
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Array.from({ length: subjectForm.numberOfStations || 4 }, (_, index) => (
+                    <div key={index}>
+                      <label className="block text-xs text-nhs-grey mb-1">
+                        Station {index + 1}
+                      </label>
+                      <input
+                        type="text"
+                        value={subjectForm.stationNames?.[index] || ''}
+                        onChange={(e) => {
+                          const newStationNames = [...(subjectForm.stationNames || [])];
+                          newStationNames[index] = e.target.value;
+                          setSubjectForm(prev => ({ ...prev, stationNames: newStationNames }));
+                        }}
+                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                        placeholder="e.g., Cardiac Assessment"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
               {/* Concurrent Activity Configuration */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
-                  Concurrent Activity (Optional)
+                  Concurrent Activity {subjectForm.type === 'assessment' ? '(Required)' : '(Optional)'}
                 </label>
                 <div className="space-y-3">
                   <div>
@@ -589,6 +678,46 @@ const ProgrammeBuilderModal = ({
                   </div>
                 </div>
               </div>
+              
+              {/* Assessment Time Slot Preview */}
+              {subjectForm.stationNames?.filter(s => s.trim() !== '').length === subjectForm.numberOfStations && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                    Assessment Time Slot Preview
+                  </label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-60 overflow-y-auto">
+                    {generateAssessmentTimeSlots(subjectForm).map((timeSlot, timeSlotIndex) => (
+                      <div key={timeSlotIndex} className="mb-3 last:mb-0">
+                        <h4 className="font-medium text-nhs-dark-grey mb-2">{timeSlot.startTime}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          {/* Assessment Stations */}
+                          <div className="md:col-span-1">
+                            <h5 className="font-medium text-nhs-blue mb-2">Assessment Stations:</h5>
+                            {timeSlot.stations.map((station, stationIndex) => (
+                              <div key={stationIndex} className="flex justify-between items-center bg-white p-2 rounded border mb-2">
+                                <span className="text-nhs-dark-grey">{station.stationName}</span>
+                                <span className="bg-purple-500 text-white px-2 py-1 rounded text-xs">Candidates {station.candidates}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Concurrent Activity */}
+                          {subjectForm.concurrentActivityName && (
+                            <div className="md:col-span-1">
+                              <h5 className="font-medium text-nhs-green mb-2">Concurrent Activity:</h5>
+                              <div className="bg-white p-2 rounded border">
+                                <div className="text-nhs-dark-grey mb-1">{subjectForm.concurrentActivityName}</div>
+                                <span className="bg-green-500 text-white px-2 py-1 rounded text-xs">
+                                  Candidates {subjectForm.concurrentCandidatesFirst || '9-16'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               <div className="md:col-span-2">
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
@@ -706,13 +835,13 @@ const ProgrammeBuilderModal = ({
                      <br /><br />
                      <strong>Group Rotation Pattern:</strong>
                      <br />
-                     • Time Slot 1: A→Station1, B→Station2, C→Station3, D→Station4
+                     • {calculateTimeSlot(subjectForm.startTime, 0, subjectForm.timeSlotDuration || 20)}: A→Station1, B→Station2, C→Station3, D→Station4
                      <br />
-                     • Time Slot 2: D→Station1, A→Station2, B→Station3, C→Station4
+                     • {calculateTimeSlot(subjectForm.startTime, 1, subjectForm.timeSlotDuration || 20)}: D→Station1, A→Station2, B→Station3, C→Station4
                      <br />
-                     • Time Slot 3: C→Station1, D→Station2, A→Station3, B→Station4
+                     • {calculateTimeSlot(subjectForm.startTime, 2, subjectForm.timeSlotDuration || 20)}: C→Station1, D→Station2, A→Station3, B→Station4
                      <br />
-                     • Time Slot 4: B→Station1, C→Station2, D→Station3, A→Station4
+                     • {calculateTimeSlot(subjectForm.startTime, 3, subjectForm.timeSlotDuration || 20)}: B→Station1, C→Station2, D→Station3, A→Station4
                      <br /><br />
                      Group assignments will be made when candidates are confirmed.
                    </p>
@@ -815,12 +944,12 @@ const ProgrammeBuilderModal = ({
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-60 overflow-y-auto">
                     {generatePracticalSessionSchedule().map((timeSlot, timeSlotIndex) => (
                       <div key={timeSlotIndex} className="mb-3 last:mb-0">
-                        <h4 className="font-medium text-nhs-dark-grey mb-2">Time Slot {timeSlot.timeSlot}</h4>
+                        <h4 className="font-medium text-nhs-dark-grey mb-2">{calculateTimeSlot(subjectForm.startTime, timeSlotIndex, subjectForm.timeSlotDuration || 30)}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                           {timeSlot.sessions.map((session, sessionIndex) => (
                             <div key={sessionIndex} className="flex justify-between items-center bg-white p-2 rounded border">
                               <span className="text-nhs-dark-grey">{session.station}</span>
-                              <span className="bg-indigo-500 text-white px-2 py-1 rounded text-xs">Group {session.groups}</span>
+                                                             <span className="bg-indigo-500 text-white px-2 py-1 rounded text-xs">Group {Array.isArray(session.groups) ? session.groups.join('+') : session.groups}</span>
                             </div>
                           ))}
                         </div>

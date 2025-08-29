@@ -154,7 +154,8 @@ const AdminPanel = () => {
     editProgrammeSubject: hookEditProgrammeSubject,
     updateProgrammeSubject: hookUpdateProgrammeSubject,
     getWorkshopGroups: hookGetWorkshopGroups,
-    getPracticalSessionGroups: hookGetPracticalSessionGroups
+    getPracticalSessionGroups: hookGetPracticalSessionGroups,
+    getPracticalSessionStationInfo: hookGetPracticalSessionStationInfo
   } = useProgrammeBuilder(selectedCourse);
   
   // Programme management - using hook values
@@ -267,6 +268,37 @@ const AdminPanel = () => {
   // Function to get workshop groups for display - using hook function
   const getWorkshopGroups = hookGetWorkshopGroups;
   const getPracticalSessionGroups = hookGetPracticalSessionGroups;
+  const getPracticalSessionStationInfo = hookGetPracticalSessionStationInfo;
+
+  // Utility function to calculate actual time slot times
+  const calculateTimeSlot = (startTime, slotIndex, slotDuration) => {
+    if (!startTime || !slotDuration) {
+      return `Time Slot ${slotIndex + 1}`;
+    }
+
+    try {
+      // Parse start time (assuming format like "09:00" or "9:00")
+      const [hours, minutes] = startTime.split(':').map(Number);
+      const startDate = new Date();
+      startDate.setHours(hours, minutes, 0, 0);
+
+      // Calculate slot start time
+      const slotStartTime = new Date(startDate.getTime() + (slotIndex * slotDuration * 60 * 1000));
+      
+      // Calculate slot end time
+      const slotEndTime = new Date(slotStartTime.getTime() + (slotDuration * 60 * 1000));
+
+      // Format times as HH:MM
+      const formatTime = (date) => {
+        return date.toTimeString().slice(0, 5);
+      };
+
+      return `${formatTime(slotStartTime)} - ${formatTime(slotEndTime)}`;
+    } catch (error) {
+      console.error('Error calculating time slot:', error);
+      return `Time Slot ${slotIndex + 1}`;
+    }
+  };
 
   const fetchAllCourses = async () => {
     try {
@@ -2397,7 +2429,7 @@ IMPACT @ Whiston Hospital`,
                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
                           Group {getWorkshopGroups(subject)}
                         </span>
-                      ) : subject.isPracticalSession ? (
+                      ) : subject.type === 'practical-session' ? (
                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
                           Group {getPracticalSessionGroups(subject)}
                         </span>
@@ -2426,7 +2458,7 @@ IMPACT @ Whiston Hospital`,
                                {subject.numberOfStations} Stations, {subject.numberOfTimeSlots} Slots
                              </span>
                            )}
-                           {subject.isScenarioPractice && (
+                           {subject.type === 'scenario-practice' && (
                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
                                {subject.numberOfStations} Stations, {subject.numberOfTimeSlots} Slots
                              </span>
@@ -2566,7 +2598,7 @@ IMPACT @ Whiston Hospital`,
                     )}
                     
                                                               {/* Detailed Schedule for Scenario Practice Sessions */}
-                     {subject.isScenarioPractice && (
+                     {subject.type === 'scenario-practice' && (
                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                          <h6 className="font-medium text-nhs-dark-grey mb-2">Scenario Practice Schedule:</h6>
                          <div className="space-y-3">
@@ -2633,7 +2665,7 @@ IMPACT @ Whiston Hospital`,
                                 {Array.from({ length: subject.numberOfTimeSlots || 4 }, (_, timeSlotIndex) => (
                                   <div key={timeSlotIndex} className="bg-white p-2 rounded border text-xs">
                                     <div className="font-medium text-nhs-dark-grey">
-                                      Time Slot {timeSlotIndex + 1} ({subject.timeSlotDuration || 20} min)
+                                      {calculateTimeSlot(subject.startTime, timeSlotIndex, subject.timeSlotDuration || 20)} ({subject.timeSlotDuration || 20} min)
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 mt-1">
                                       {Array.from({ length: subject.numberOfStations || 4 }, (_, stationIndex) => {
@@ -2686,7 +2718,7 @@ IMPACT @ Whiston Hospital`,
                           Assign Faculty
                         </button>
                         {/* Show station faculty assignment button for practical sessions */}
-                        {subject.isPracticalSession && (
+                        {subject.type === 'practical-session' && (
                           <button
                             onClick={() => {
                               setSelectedSubject(subject);
@@ -2718,24 +2750,28 @@ IMPACT @ Whiston Hospital`,
                     </div>
                     
                     {/* Show station faculty assignments for practical sessions */}
-                    {subject.isPracticalSession && subject.stationFaculty && (
+                    {subject.type === 'practical-session' && subject.stationFaculty && (
                       <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
                         <h6 className="font-medium text-nhs-dark-grey mb-2">Station Faculty Assignments:</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                          {subject.stationFaculty.map((stationFaculty, stationIndex) => (
-                            <div key={stationIndex} className="bg-white p-2 rounded border">
-                              <div className="font-medium text-nhs-dark-grey">
-                                Station {stationIndex + 1}: {subject.stationNames?.[stationIndex] || `Station ${stationIndex + 1}`}
+                          {subject.stationFaculty.map((stationFaculty, stationIndex) => {
+                            // Use stationNames if available, otherwise fall back to Station number
+                            const stationName = subject.stationNames?.[stationIndex] || `Station ${stationIndex + 1}`;
+                            return (
+                              <div key={stationIndex} className="bg-white p-2 rounded border">
+                                <div className="font-medium text-nhs-dark-grey">
+                                  {stationName}
+                                </div>
+                                <div className="text-nhs-grey">
+                                  {stationFaculty.length > 0 ? (
+                                    stationFaculty.map(faculty => faculty.name).join(', ')
+                                  ) : (
+                                    'No faculty assigned'
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-nhs-grey">
-                                {stationFaculty.length > 0 ? (
-                                  stationFaculty.map(faculty => faculty.name).join(', ')
-                                ) : (
-                                  'No faculty assigned'
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}

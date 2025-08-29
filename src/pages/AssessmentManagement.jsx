@@ -3,6 +3,7 @@ import { collection, getDocs, doc, updateDoc, addDoc, query, orderBy, where } fr
 import { db } from '../firebase/config';
 import { cloudFunctions, downloadCSV, downloadJSON } from '../utils/cloudFunctions';
 import { useAuth } from '../contexts/AuthContext';
+import { useProgrammeBuilder } from '../hooks/useProgrammeBuilder';
 import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -25,7 +26,9 @@ import {
   Menu,
   X,
   Settings,
-  LogOut
+  LogOut,
+  Calendar,
+  MapPin
 } from 'lucide-react';
 
 const AssessmentManagement = () => {
@@ -37,23 +40,58 @@ const AssessmentManagement = () => {
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
   const [showUnsuccessfulModal, setShowUnsuccessfulModal] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [courses, setCourses] = useState([]);
+  
+  // Programme builder integration
+  const {
+    getAssessmentSubjects,
+    getCandidateAssignments,
+    getCandidateAssessmentStatus,
+    createStationAssessment,
+    getStationAssessments,
+    updateAssessmentCompletion,
+    getCandidatePairs,
+    getConcurrentActivitySchedule
+  } = useProgrammeBuilder(selectedCourse);
+
+  // Updated assessment form for station-based assessments
   const [assessmentForm, setAssessmentForm] = useState({
-    attendance: false,
-    thoracocentesis: false,
-    cvp: false,
-    lumbarPuncture: false,
-    testScenario: false,
-    overallAssessment: 'pending',
-    notes: '',
-    assessorName: '',
-    assessmentDate: new Date()
+    // Station-specific assessment data
+    stationAssessment: {
+      attendance: false,
+      thoracocentesis: false,
+      cvp: false,
+      lumbarPuncture: false,
+      testScenario: false,
+      overallAssessment: 'pending',
+      notes: '',
+      assessorName: '',
+      assessmentDate: new Date()
+    },
+    // Programme assessment integration
+    selectedAssessmentSubject: null,
+    selectedTimeSlot: null,
+    selectedStation: null,
+    candidateAssignment: null
   });
+
+  // Assessment status tracking
+  const [candidateAssessmentStatus, setCandidateAssessmentStatus] = useState({});
+  const [stationAssessments, setStationAssessments] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetchCandidates();
     fetchAssessments();
+    fetchCourses();
   }, []);
+
+  useEffect(() => {
+    if (selectedCourse) {
+      fetchStationAssessments();
+    }
+  }, [selectedCourse]);
 
   const fetchCandidates = async () => {
     try {
@@ -96,18 +134,119 @@ const AssessmentManagement = () => {
     }
   };
 
-  const openAssessmentModal = (candidate) => {
+  const fetchCourses = async () => {
+    try {
+      const coursesSnapshot = await getDocs(collection(db, 'courses'));
+      const coursesData = coursesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).filter(course => course.status === 'active' && !course.archived);
+      
+      setCourses(coursesData);
+      if (coursesData.length > 0 && !selectedCourse) {
+        setSelectedCourse(coursesData[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      toast.error('Failed to fetch courses');
+    }
+  };
+
+  const fetchStationAssessments = async () => {
+    if (!selectedCourse) return;
+    
+    try {
+      const assessments = await getStationAssessments(selectedCourse.id);
+      setStationAssessments(assessments);
+    } catch (error) {
+      console.error('Error fetching station assessments:', error);
+    }
+  };
+
+  const openAssessmentModal = async (candidate) => {
     setSelectedCandidate(candidate);
+    
+    // Get candidate's assessment status and assignments
+    if (selectedCourse) {
+      const status = await getCandidateAssessmentStatus(candidate.id, selectedCourse.id);
+      setCandidateAssessmentStatus(prev => ({
+        ...prev,
+        [candidate.id]: status
+      }));
+    }
+    
     setShowAssessmentModal(true);
   };
 
+  const saveStationAssessment = async () => {
+    try {
+      if (!assessmentForm.selectedAssessmentSubject || 
+          !assessmentForm.selectedTimeSlot || 
+          !assessmentForm.selectedStation) {
+        toast.error('Please select assessment subject, time slot, and station');
+        return;
+      }
+
+      // Create station assessment record
+      const success = await createStationAssessment(
+        selectedCandidate.id,
+        assessmentForm.selectedAssessmentSubject.id,
+        assessmentForm.selectedTimeSlot,
+        assessmentForm.selectedStation,
+        {
+          ...assessmentForm.stationAssessment,
+          candidateName: `${selectedCandidate.firstName} ${selectedCandidate.surname}`,
+          candidateEmail: selectedCandidate.email,
+          assessorName: assessmentForm.stationAssessment.assessorName,
+          assessmentDate: new Date()
+        }
+      );
+
+      if (success) {
+        // Update assessment completion status
+        await updateAssessmentCompletion(selectedCandidate.id, selectedCourse.id);
+        
+        toast.success('Station assessment saved successfully');
+        setShowAssessmentModal(false);
+        fetchCandidates();
+        fetchStationAssessments();
+        
+        // Reset form
+        setAssessmentForm(prev => ({
+          ...prev,
+          stationAssessment: {
+            attendance: false,
+            thoracocentesis: false,
+            cvp: false,
+            lumbarPuncture: false,
+            testScenario: false,
+            overallAssessment: 'pending',
+            notes: '',
+            assessorName: '',
+            assessmentDate: new Date()
+          },
+          selectedAssessmentSubject: null,
+          selectedTimeSlot: null,
+          selectedStation: null,
+          candidateAssignment: null
+        }));
+      } else {
+        toast.error('Failed to save station assessment');
+      }
+    } catch (error) {
+      console.error('Error saving station assessment:', error);
+      toast.error('Failed to save station assessment');
+    }
+  };
+
+  // Legacy function for backward compatibility
   const saveAssessment = async () => {
     try {
       const assessmentData = {
         candidateId: selectedCandidate.id,
         candidateName: `${selectedCandidate.firstName} ${selectedCandidate.surname}`,
         candidateEmail: selectedCandidate.email,
-        ...assessmentForm,
+        ...assessmentForm.stationAssessment,
         assessmentDate: new Date(),
         createdAt: new Date()
       };
@@ -116,7 +255,7 @@ const AssessmentManagement = () => {
 
       // Update candidate status
       await updateDoc(doc(db, 'candidates', selectedCandidate.id), {
-        courseStatus: assessmentForm.overallAssessment,
+        courseStatus: assessmentForm.stationAssessment.overallAssessment,
         assessmentCompleted: true,
         assessmentDate: new Date()
       });
@@ -559,125 +698,277 @@ const AssessmentManagement = () => {
       {/* Assessment Modal */}
       {showAssessmentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">
-              Assessment for {selectedCandidate?.firstName} {selectedCandidate?.surname}
+              Assessment Rotation for {selectedCandidate?.firstName} {selectedCandidate?.surname}
             </h3>
             
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium text-nhs-dark-grey mb-2">Practical Skills</h4>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={assessmentForm.thoracocentesis}
-                      onChange={(e) => setAssessmentForm(prev => ({ ...prev, thoracocentesis: e.target.checked }))}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm">Thoracocentesis</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={assessmentForm.cvp}
-                      onChange={(e) => setAssessmentForm(prev => ({ ...prev, cvp: e.target.checked }))}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm">Central Venous Pressure (CVP)</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={assessmentForm.lumbarPuncture}
-                      onChange={(e) => setAssessmentForm(prev => ({ ...prev, lumbarPuncture: e.target.checked }))}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm">Lumbar Puncture</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-medium text-nhs-dark-grey mb-2">Assessment Components</h4>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={assessmentForm.attendance}
-                      onChange={(e) => setAssessmentForm(prev => ({ ...prev, attendance: e.target.checked }))}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm">Full Attendance</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={assessmentForm.testScenario}
-                      onChange={(e) => setAssessmentForm(prev => ({ ...prev, testScenario: e.target.checked }))}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm">Test Scenario Performance</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
-                  Overall Assessment
-                </label>
-                <select
-                  value={assessmentForm.overallAssessment}
-                  onChange={(e) => setAssessmentForm(prev => ({ ...prev, overallAssessment: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="Pass">Pass</option>
-                  <option value="Fail">Fail</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
-                  Assessor Name
-                </label>
-                <input
-                  type="text"
-                  value={assessmentForm.assessorName}
-                  onChange={(e) => setAssessmentForm(prev => ({ ...prev, assessorName: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  placeholder="Enter assessor name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
-                  Notes
-                </label>
-                <textarea
-                  value={assessmentForm.notes}
-                  onChange={(e) => setAssessmentForm(prev => ({ ...prev, notes: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  rows={3}
-                  placeholder="Additional notes..."
-                />
-              </div>
+            {/* Course Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                Select Course
+              </label>
+              <select
+                value={selectedCourse?.id || ''}
+                onChange={(e) => {
+                  const course = courses.find(c => c.id === e.target.value);
+                  setSelectedCourse(course);
+                }}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Select a course</option>
+                {courses.map(course => (
+                  <option key={course.id} value={course.id}>
+                    {course.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={saveAssessment}
-                className="bg-nhs-blue text-white px-4 py-2 rounded-md hover:bg-nhs-dark-blue"
-              >
-                Save Assessment
-              </button>
-              <button
-                onClick={() => setShowAssessmentModal(false)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
+            {selectedCourse && (
+              <div className="space-y-6">
+                                 {/* Assessment Subjects */}
+                 <div>
+                   <h4 className="font-medium text-nhs-dark-grey mb-3">Assessment Subjects</h4>
+                   {getAssessmentSubjects(selectedCourse.id).map(subject => (
+                     <div key={subject.id} className="border border-gray-200 rounded-lg p-4 mb-4">
+                       <h5 className="font-medium text-nhs-blue mb-2">{subject.name}</h5>
+                       
+                       {/* Concurrent Activity Schedule */}
+                       {subject.concurrentActivityName && (
+                         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
+                           <h6 className="font-medium text-green-700 mb-2">Concurrent Activity: {subject.concurrentActivityName}</h6>
+                           <div className="text-sm text-green-600">
+                             {getConcurrentActivitySchedule(subject).map((activity, idx) => (
+                               <div key={idx} className="flex justify-between items-center">
+                                 <span>Time Slot {activity.timeSlot} ({activity.startTime})</span>
+                                 <span>Candidates {activity.candidates}</span>
+                               </div>
+                             ))}
+                           </div>
+                         </div>
+                       )}
+                       
+                       {/* Assessment Station Pairs */}
+                       <div className="space-y-3">
+                         {getCandidatePairs(subject).filter(pair => pair.activityType === 'assessment').map((pair, index) => (
+                          <div key={index} className="bg-gray-50 p-3 rounded">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium">
+                                Time Slot {pair.timeSlot} - {pair.stationName}
+                              </span>
+                              <span className="text-xs text-gray-500">{pair.startTime}</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              {/* Candidate 1 - Assessed */}
+                              <div className="bg-white p-3 rounded border-l-4 border-nhs-blue">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-sm font-medium">Candidate {pair.candidate1}</span>
+                                  <span className="text-xs bg-nhs-blue text-white px-2 py-1 rounded">Assessed</span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setAssessmentForm(prev => ({
+                                      ...prev,
+                                      selectedAssessmentSubject: subject,
+                                      selectedTimeSlot: pair.timeSlot,
+                                      selectedStation: pair.station,
+                                      candidateAssignment: {
+                                        candidateNumber: pair.candidate1,
+                                        role: 'Assessed'
+                                      }
+                                    }));
+                                  }}
+                                  className="text-xs bg-nhs-blue text-white px-3 py-1 rounded hover:bg-nhs-dark-blue"
+                                >
+                                  Record Assessment
+                                </button>
+                              </div>
+                              
+                              {/* Candidate 2 - Assist */}
+                              <div className="bg-white p-3 rounded border-l-4 border-gray-300">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-sm font-medium">Candidate {pair.candidate2}</span>
+                                  <span className="text-xs bg-gray-500 text-white px-2 py-1 rounded">Assist</span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setAssessmentForm(prev => ({
+                                      ...prev,
+                                      selectedAssessmentSubject: subject,
+                                      selectedTimeSlot: pair.timeSlot,
+                                      selectedStation: pair.station,
+                                      candidateAssignment: {
+                                        candidateNumber: pair.candidate2,
+                                        role: 'Assist'
+                                      }
+                                    }));
+                                  }}
+                                  className="text-xs bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600"
+                                >
+                                  Record Assistance
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Assessment Form */}
+                {assessmentForm.selectedAssessmentSubject && (
+                  <div className="border-t pt-6">
+                    <h4 className="font-medium text-nhs-dark-grey mb-3">
+                      Assessment Record - {assessmentForm.selectedAssessmentSubject.name}
+                    </h4>
+                    <div className="bg-gray-50 p-4 rounded">
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <span className="text-sm font-medium">Time Slot:</span>
+                          <span className="text-sm ml-2">{assessmentForm.selectedTimeSlot}</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium">Station:</span>
+                          <span className="text-sm ml-2">{assessmentForm.selectedStation}</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium">Candidate:</span>
+                          <span className="text-sm ml-2">{assessmentForm.candidateAssignment?.candidateNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium">Role:</span>
+                          <span className="text-sm ml-2">{assessmentForm.candidateAssignment?.role}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <h5 className="font-medium text-nhs-dark-grey mb-2">Assessment Criteria</h5>
+                          <div className="space-y-2">
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={assessmentForm.stationAssessment.attendance}
+                                onChange={(e) => setAssessmentForm(prev => ({
+                                  ...prev,
+                                  stationAssessment: { ...prev.stationAssessment, attendance: e.target.checked }
+                                }))}
+                                className="rounded border-gray-300"
+                              />
+                              <span className="text-sm">Full Attendance</span>
+                            </label>
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={assessmentForm.stationAssessment.thoracocentesis}
+                                onChange={(e) => setAssessmentForm(prev => ({
+                                  ...prev,
+                                  stationAssessment: { ...prev.stationAssessment, thoracocentesis: e.target.checked }
+                                }))}
+                                className="rounded border-gray-300"
+                              />
+                              <span className="text-sm">Thoracocentesis</span>
+                            </label>
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={assessmentForm.stationAssessment.cvp}
+                                onChange={(e) => setAssessmentForm(prev => ({
+                                  ...prev,
+                                  stationAssessment: { ...prev.stationAssessment, cvp: e.target.checked }
+                                }))}
+                                className="rounded border-gray-300"
+                              />
+                              <span className="text-sm">Central Venous Pressure (CVP)</span>
+                            </label>
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={assessmentForm.stationAssessment.lumbarPuncture}
+                                onChange={(e) => setAssessmentForm(prev => ({
+                                  ...prev,
+                                  stationAssessment: { ...prev.stationAssessment, lumbarPuncture: e.target.checked }
+                                }))}
+                                className="rounded border-gray-300"
+                              />
+                              <span className="text-sm">Lumbar Puncture</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                            Overall Assessment
+                          </label>
+                          <select
+                            value={assessmentForm.stationAssessment.overallAssessment}
+                            onChange={(e) => setAssessmentForm(prev => ({
+                              ...prev,
+                              stationAssessment: { ...prev.stationAssessment, overallAssessment: e.target.value }
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="Pass">Pass</option>
+                            <option value="Fail">Fail</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                            Assessor Name
+                          </label>
+                          <input
+                            type="text"
+                            value={assessmentForm.stationAssessment.assessorName}
+                            onChange={(e) => setAssessmentForm(prev => ({
+                              ...prev,
+                              stationAssessment: { ...prev.stationAssessment, assessorName: e.target.value }
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                            placeholder="Enter assessor name"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                            Notes
+                          </label>
+                          <textarea
+                            value={assessmentForm.stationAssessment.notes}
+                            onChange={(e) => setAssessmentForm(prev => ({
+                              ...prev,
+                              stationAssessment: { ...prev.stationAssessment, notes: e.target.value }
+                            }))}
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                            rows={3}
+                            placeholder="Additional notes..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-3 mt-6">
+                        <button
+                          onClick={saveStationAssessment}
+                          className="bg-nhs-blue text-white px-4 py-2 rounded-md hover:bg-nhs-dark-blue"
+                        >
+                          Save Station Assessment
+                        </button>
+                        <button
+                          onClick={() => setShowAssessmentModal(false)}
+                          className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
