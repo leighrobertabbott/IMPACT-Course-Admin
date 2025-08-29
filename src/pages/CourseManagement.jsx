@@ -96,13 +96,15 @@ const CourseManagement = () => {
     deleteProgrammeSubject: hookDeleteProgrammeSubject,
     editProgrammeSubject: hookEditProgrammeSubject,
     updateProgrammeSubject: hookUpdateProgrammeSubject,
-    getWorkshopGroups: hookGetWorkshopGroups
+    getWorkshopGroups: hookGetWorkshopGroups,
+    getPracticalSessionGroups: hookGetPracticalSessionGroups
   } = useProgrammeBuilder(selectedCourse);
 
 
 
   // Function to get workshop groups for display - using hook function (MOVED HERE)
   const getWorkshopGroups = hookGetWorkshopGroups;
+  const getPracticalSessionGroups = hookGetPracticalSessionGroups;
 
   // New state for programme building - using hook values (MOVED HERE)
   const programmeSubjects = hookProgrammeSubjects;
@@ -1552,6 +1554,10 @@ const CourseManagement = () => {
                            {subject.isWorkshopRotation ? (
                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
                                Group {getWorkshopGroups(subject)}
+                             </span>
+                           ) : subject.isPracticalSession ? (
+                             <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                               Group {getPracticalSessionGroups(subject)}
                              </span>
                            ) : (
                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">

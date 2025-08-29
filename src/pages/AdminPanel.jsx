@@ -153,7 +153,8 @@ const AdminPanel = () => {
     deleteProgrammeSubject: hookDeleteProgrammeSubject,
     editProgrammeSubject: hookEditProgrammeSubject,
     updateProgrammeSubject: hookUpdateProgrammeSubject,
-    getWorkshopGroups: hookGetWorkshopGroups
+    getWorkshopGroups: hookGetWorkshopGroups,
+    getPracticalSessionGroups: hookGetPracticalSessionGroups
   } = useProgrammeBuilder(selectedCourse);
   
   // Programme management - using hook values
@@ -265,6 +266,7 @@ const AdminPanel = () => {
 
   // Function to get workshop groups for display - using hook function
   const getWorkshopGroups = hookGetWorkshopGroups;
+  const getPracticalSessionGroups = hookGetPracticalSessionGroups;
 
   const fetchAllCourses = async () => {
     try {
@@ -2394,6 +2396,10 @@ IMPACT @ Whiston Hospital`,
                       {subject.isWorkshopRotation ? (
                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
                           Group {getWorkshopGroups(subject)}
+                        </span>
+                      ) : subject.isPracticalSession ? (
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                          Group {getPracticalSessionGroups(subject)}
                         </span>
                       ) : (
                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">

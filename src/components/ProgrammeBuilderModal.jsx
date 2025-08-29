@@ -103,6 +103,57 @@ const ProgrammeBuilderModal = ({
     return schedule;
   };
 
+  const generatePracticalSessionSchedule = () => {
+    if (!subjectForm.stationNames || subjectForm.stationNames.length === 0) {
+      return [];
+    }
+
+    const groups = ['A', 'B', 'C', 'D'];
+    const schedule = [];
+    const stationNames = subjectForm.stationNames.filter(name => name.trim() !== '');
+    const numberOfStations = subjectForm.numberOfStations || 2;
+    const numberOfTimeSlots = subjectForm.numberOfTimeSlots || 2;
+
+    // If we have fewer stations than groups, combine groups
+    const shouldCombineGroups = numberOfStations < groups.length;
+
+    for (let timeSlot = 1; timeSlot <= numberOfTimeSlots; timeSlot++) {
+      const timeSlotSessions = [];
+      
+      if (shouldCombineGroups) {
+        // Calculate how many groups should be combined per station
+        const groupsPerStation = Math.ceil(groups.length / numberOfStations);
+        
+        for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+          const startGroupIndex = ((timeSlot - 1) * groupsPerStation) % groups.length;
+          const endGroupIndex = Math.min(startGroupIndex + groupsPerStation, groups.length);
+          const combinedGroups = groups.slice(startGroupIndex, endGroupIndex);
+          
+          timeSlotSessions.push({
+            station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
+            groups: combinedGroups.join('+')
+          });
+        }
+      } else {
+        // Standard rotation - one group per station
+        for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+          const groupIndex = (stationIndex + (timeSlot - 1)) % groups.length;
+          timeSlotSessions.push({
+            station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
+            groups: groups[groupIndex]
+          });
+        }
+      }
+
+      schedule.push({
+        timeSlot,
+        sessions: timeSlotSessions
+      });
+    }
+
+    return schedule;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -751,12 +802,46 @@ const ProgrammeBuilderModal = ({
                 </div>
               </div>
               
+              {/* Rotation Schedule Preview */}
+              {subjectForm.stationNames?.filter(s => s.trim() !== '').length === subjectForm.numberOfStations && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                    Rotation Schedule Preview
+                  </label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-60 overflow-y-auto">
+                    {generatePracticalSessionSchedule().map((timeSlot, timeSlotIndex) => (
+                      <div key={timeSlotIndex} className="mb-3 last:mb-0">
+                        <h4 className="font-medium text-nhs-dark-grey mb-2">Time Slot {timeSlot.timeSlot}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          {timeSlot.sessions.map((session, sessionIndex) => (
+                            <div key={sessionIndex} className="flex justify-between items-center bg-white p-2 rounded border">
+                              <span className="text-nhs-dark-grey">{session.station}</span>
+                              <span className="bg-indigo-500 text-white px-2 py-1 rounded text-xs">Group {session.groups}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <div className="md:col-span-2">
                 <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
                   <p className="text-sm text-indigo-800">
                     <strong>Practical Session Setup:</strong> This will create a practical session with {subjectForm.numberOfStations || 2} stations 
                     and {subjectForm.numberOfTimeSlots || 2} time slots of {subjectForm.timeSlotDuration || 30} minutes each. 
-                    Candidates will be grouped and rotate between stations. Group assignments will be made when candidates are confirmed.
+                    Groups will rotate through the stations with proper group combinations when there are fewer stations than groups.
+                    <br /><br />
+                    <strong>Faculty Assignment:</strong> Faculty are assigned to specific stations and will remain at their assigned stations throughout all time slots.
+                    <br /><br />
+                    <strong>Group Rotation Pattern:</strong>
+                    <br />
+                    • When stations &lt; groups: Groups are combined (e.g., A+B, C+D)
+                    <br />
+                    • When stations ≥ groups: Each group rotates through stations
+                    <br /><br />
+                    Group assignments will be made when candidates are confirmed.
                   </p>
                 </div>
               </div>

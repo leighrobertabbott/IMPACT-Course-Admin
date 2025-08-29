@@ -131,6 +131,29 @@ export const useProgrammeBuilder = (selectedCourse) => {
     return workshopGroups.sort().join(', ');
   };
 
+  // Function to get practical session groups for display
+  const getPracticalSessionGroups = (subject) => {
+    if (!subject.isPracticalSession || !subject.rotationSchedule) {
+      return null;
+    }
+
+    const groups = ['A', 'B', 'C', 'D'];
+    const allGroups = new Set();
+
+    // Collect all groups that attend this practical session across all time slots
+    subject.rotationSchedule.forEach(timeSlot => {
+      timeSlot.sessions.forEach(session => {
+        if (session.groups) {
+          session.groups.forEach(group => {
+            allGroups.add(group);
+          });
+        }
+      });
+    });
+
+    return Array.from(allGroups).sort().join(', ');
+  };
+
   // Fetch programme subjects
   const fetchProgrammeSubjects = async () => {
     try {
@@ -298,8 +321,84 @@ export const useProgrammeBuilder = (selectedCourse) => {
         }
 
         toast.success('Workshop rotation subjects added successfully');
+      } else if (subjectForm.type === 'practical-session') {
+        // Handle practical session with rotation logic
+        if (!subjectForm.stationNames || subjectForm.stationNames.filter(s => s.trim() !== '').length !== subjectForm.numberOfStations) {
+          toast.error('Please select all station names');
+          return;
+        }
+
+        const groups = ['A', 'B', 'C', 'D'];
+        const stationNames = subjectForm.stationNames.filter(name => name.trim() !== '');
+        const numberOfStations = subjectForm.numberOfStations;
+        const numberOfTimeSlots = subjectForm.numberOfTimeSlots;
+
+        // Generate rotation schedule for practical session
+        const rotationSchedule = [];
+        const shouldCombineGroups = numberOfStations < groups.length;
+
+        for (let timeSlot = 1; timeSlot <= numberOfTimeSlots; timeSlot++) {
+          const timeSlotSessions = [];
+          
+          if (shouldCombineGroups) {
+            // Calculate how many groups should be combined per station
+            const groupsPerStation = Math.ceil(groups.length / numberOfStations);
+            
+            for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+              const startGroupIndex = ((timeSlot - 1) * groupsPerStation) % groups.length;
+              const endGroupIndex = Math.min(startGroupIndex + groupsPerStation, groups.length);
+              const combinedGroups = groups.slice(startGroupIndex, endGroupIndex);
+              
+              timeSlotSessions.push({
+                station: stationNames[stationIndex],
+                groups: combinedGroups
+              });
+            }
+          } else {
+            // Standard rotation - one group per station
+            for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+              const groupIndex = (stationIndex + (timeSlot - 1)) % groups.length;
+              timeSlotSessions.push({
+                station: stationNames[stationIndex],
+                groups: [groups[groupIndex]]
+              });
+            }
+          }
+
+          rotationSchedule.push({
+            timeSlot,
+            sessions: timeSlotSessions
+          });
+        }
+
+        const subjectData = {
+          ...subjectForm,
+          courseId: selectedCourse.id,
+          isWorkshopRotation: false,
+          rotationSequence: null,
+          workshopIndex: null,
+          totalWorkshops: null,
+          totalRotations: null,
+          rotationSchedule: rotationSchedule,
+          completedGroups: [],
+          isAssessment: false,
+          isScenarioPractice: false,
+          isPracticalSession: true,
+          numberOfStations: subjectForm.numberOfStations,
+          numberOfTimeSlots: subjectForm.numberOfTimeSlots,
+          timeSlotDuration: subjectForm.timeSlotDuration,
+          stationNames: subjectForm.stationNames,
+          concurrentActivityName: '',
+          scenarioCandidatesFirst: '',
+          concurrentCandidatesFirst: '',
+          scenarioCandidatesSecond: '',
+          concurrentCandidatesSecond: ''
+        };
+
+        await addDoc(collection(db, 'programmeSubjects'), subjectData);
+        toast.success('Practical session added successfully');
       } else {
-        // Handle regular subjects (non-workshop rotation)
+        // Handle regular subjects (non-workshop rotation, non-practical session)
         const subjectData = {
           ...subjectForm,
           courseId: selectedCourse.id,
@@ -474,6 +573,7 @@ export const useProgrammeBuilder = (selectedCourse) => {
     deleteProgrammeSubject,
     editProgrammeSubject,
     updateProgrammeSubject,
-    getWorkshopGroups
+    getWorkshopGroups,
+    getPracticalSessionGroups
   };
 };
