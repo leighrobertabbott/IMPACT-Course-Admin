@@ -114,33 +114,37 @@ const ProgrammeBuilderModal = ({
     const numberOfStations = subjectForm.numberOfStations || 2;
     const numberOfTimeSlots = subjectForm.numberOfTimeSlots || 2;
 
-    // If we have fewer stations than groups, combine groups
-    const shouldCombineGroups = numberOfStations < groups.length;
-
     for (let timeSlot = 1; timeSlot <= numberOfTimeSlots; timeSlot++) {
       const timeSlotSessions = [];
       
-      if (shouldCombineGroups) {
-        // Calculate how many groups should be combined per station
-        const groupsPerStation = Math.ceil(groups.length / numberOfStations);
-        
-        for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
-          const startGroupIndex = ((timeSlot - 1) * groupsPerStation) % groups.length;
-          const endGroupIndex = Math.min(startGroupIndex + groupsPerStation, groups.length);
-          const combinedGroups = groups.slice(startGroupIndex, endGroupIndex);
-          
-          timeSlotSessions.push({
-            station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
-            groups: combinedGroups.join('+')
-          });
-        }
-      } else {
-        // Standard rotation - one group per station
-        for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+      // For each time slot, distribute groups across stations
+      for (let stationIndex = 0; stationIndex < numberOfStations; stationIndex++) {
+        // Calculate which group(s) go to this station
+        if (numberOfStations >= groups.length) {
+          // More stations than groups - one group per station, rotate
           const groupIndex = (stationIndex + (timeSlot - 1)) % groups.length;
           timeSlotSessions.push({
             station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
             groups: groups[groupIndex]
+          });
+        } else {
+          // Fewer stations than groups - combine groups
+          const groupsPerStation = Math.ceil(groups.length / numberOfStations);
+          const startGroupIndex = stationIndex * groupsPerStation;
+          const endGroupIndex = Math.min(startGroupIndex + groupsPerStation, groups.length);
+          
+          // Get the base groups for this station
+          const baseGroups = groups.slice(startGroupIndex, endGroupIndex);
+          
+          // Rotate the groups for this time slot
+          const rotatedGroups = baseGroups.map((_, index) => {
+            const rotatedIndex = (startGroupIndex + index + (timeSlot - 1)) % groups.length;
+            return groups[rotatedIndex];
+          });
+          
+          timeSlotSessions.push({
+            station: stationNames[stationIndex] || `Station ${stationIndex + 1}`,
+            groups: rotatedGroups.join('+')
           });
         }
       }
