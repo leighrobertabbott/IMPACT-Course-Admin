@@ -249,6 +249,10 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
             workshop.rotationSchedule.forEach((schedule, slotIndex) => {
               // Debug: Log schedule data
               console.log(`Schedule ${slotIndex} for workshop ${workshop.name}:`, schedule);
+              if (schedule.sessions) {
+                console.log(`Sessions for ${workshop.name} slot ${slotIndex}:`, schedule.sessions);
+                console.log(`Rotation for ${workshop.name} slot ${slotIndex}:`, schedule.rotation);
+              }
               
               // Calculate actual time instead of generic slot
               const timeSlot = calculateTimeSlot(workshop.startTime, slotIndex, workshop.workshopDuration || 40);
@@ -261,6 +265,31 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
                 groups = schedule.group;
               } else if (schedule.assignedGroups && Array.isArray(schedule.assignedGroups)) {
                 groups = schedule.assignedGroups.join(', ');
+              } else if (schedule.sessions && Array.isArray(schedule.sessions)) {
+                // Handle sessions structure - extract groups from sessions
+                const sessionGroups = schedule.sessions.map(session => {
+                  if (session.groups && Array.isArray(session.groups)) {
+                    return session.groups.join(', ');
+                  } else if (session.group) {
+                    return session.group;
+                  }
+                  return null;
+                }).filter(Boolean);
+                
+                if (sessionGroups.length > 0) {
+                  groups = sessionGroups.join(' / ');
+                } else {
+                  // If no groups found in sessions, try to derive from rotation number
+                  // This is a fallback for workshops that don't have proper group data
+                  const rotation = schedule.rotation || 1;
+                  if (rotation === 1) {
+                    groups = 'A, B';
+                  } else if (rotation === 2) {
+                    groups = 'C, D';
+                  } else {
+                    groups = 'TBD';
+                  }
+                }
               }
               
               // Debug: Log what groups we found
