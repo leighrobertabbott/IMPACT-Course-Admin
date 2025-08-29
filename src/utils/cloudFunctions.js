@@ -171,6 +171,32 @@ export const cloudFunctions = {
       toast.error('Failed to cleanup deleted subjects');
       throw error;
     }
+  },
+
+  // Create faculty account using Admin SDK
+  createFacultyAccount: async (facultyData) => {
+    try {
+      const createFacultyAccountFunction = httpsCallable(functions, 'createFacultyAccount');
+      const result = await createFacultyAccountFunction(facultyData);
+      return result.data;
+    } catch (error) {
+      console.error('Error creating faculty account:', error);
+      toast.error('Failed to create faculty account');
+      throw error;
+    }
+  },
+
+  // Purge all faculty accounts (DEBUG ONLY)
+  purgeAllFaculty: async () => {
+    try {
+      const purgeAllFacultyFunction = httpsCallable(functions, 'purgeAllFaculty');
+      const result = await purgeAllFacultyFunction();
+      return result.data;
+    } catch (error) {
+      console.error('Error purging faculty accounts:', error);
+      toast.error('Failed to purge faculty accounts');
+      throw error;
+    }
   }
 };
 

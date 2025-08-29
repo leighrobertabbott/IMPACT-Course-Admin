@@ -52,6 +52,14 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
       console.log('Total programme items:', programmeData.length);
       console.log('Workshop rotation items:', programmeData.filter(item => item.isWorkshopRotation).length);
       console.log('Non-workshop items:', programmeData.filter(item => !item.isWorkshopRotation).length);
+      console.log('Selected course ID:', selectedCourse.id);
+      console.log('Selected course name:', selectedCourse.name);
+      
+      // If no programme data exists, show a helpful message
+      if (programmeData.length === 0) {
+        console.warn('No programme subjects found for this course. Please add programme subjects in Course Management.');
+        toast.error('No programme data found. Please add programme subjects in Course Management first.');
+      }
       
       // Sort by day and time
       programmeData.sort((a, b) => {
@@ -61,6 +69,7 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
       setProgramme(programmeData);
     } catch (error) {
       console.error('Error fetching programme:', error);
+      toast.error('Failed to fetch programme data');
     }
   };
 
@@ -72,8 +81,14 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
         ...doc.data()
       }));
       
-      // Use the first location or create a default one
-      const defaultLocation = locationsData[0] || {
+      // Use the selected location from the course, or fall back to first location, or create a default one
+      let selectedLocation = null;
+      
+      if (selectedCourse.locationId) {
+        selectedLocation = locationsData.find(loc => loc.id === selectedCourse.locationId);
+      }
+      
+      const defaultLocation = selectedLocation || locationsData[0] || {
         name: selectedCourse.venue || 'Course Venue',
         address: {
           street: 'Warrington Road',
@@ -207,7 +222,7 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
     // Subtitle
     doc.setFontSize(18);
     doc.setFont('helvetica', 'normal');
-    doc.text('Interventional Management of Patients with Acute Coronary Thrombosis', 105, 155, { align: 'center' });
+    doc.text('Ill Medical Patients\' Acute Care and Treatment', 105, 155, { align: 'center' });
     
     // Course details
     doc.setFontSize(16);
@@ -253,20 +268,34 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
       doc.text(label, 20, yPos);
       doc.setFont('helvetica', 'normal');
       doc.text(value, 80, yPos);
-      yPos += 8;
+      yPos += 12; // Increased spacing between lines
     });
     
     // Course description
     if (selectedCourse.description) {
-      yPos += 10;
+      yPos += 15; // More space before description
       doc.setFont('helvetica', 'bold');
       doc.text('Course Description:', 20, yPos);
-      yPos += 8;
+      yPos += 10; // More space after header
       doc.setFont('helvetica', 'normal');
       const descriptionLines = doc.splitTextToSize(selectedCourse.description, 170);
+      
+      // Check if we have enough space for the description
+      const descriptionHeight = descriptionLines.length * 8;
+      if (yPos + descriptionHeight > 250) {
+        // Not enough space, add a new page
+        doc.addPage();
+        doc.setFillColor(240, 248, 255);
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Course Information (continued)', 20, 25);
+        yPos = 50;
+      }
+      
       descriptionLines.forEach(line => {
         doc.text(line, 20, yPos);
-        yPos += 6;
+        yPos += 8; // Increased line spacing
       });
     }
     
@@ -293,86 +322,126 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     
-    // Address
+    // Address - with proper line spacing
     const address = [
       location.address.street,
       location.address.city,
       location.address.postcode,
       location.address.country
-    ].filter(line => line.trim());
+    ].filter(line => line && line.trim());
     
     let yPos = 65;
     address.forEach(line => {
       doc.text(line, 20, yPos);
-      yPos += 6;
+      yPos += 8; // Increased spacing
     });
     
     // Contact information
     if (location.contact.phone || location.contact.email || location.contact.website) {
-      yPos += 10;
+      yPos += 12; // More space before section
       doc.setFont('helvetica', 'bold');
       doc.text('Contact Information:', 20, yPos);
-      yPos += 8;
+      yPos += 10; // More space after header
       doc.setFont('helvetica', 'normal');
       
       if (location.contact.phone) {
         doc.text(`Phone: ${location.contact.phone}`, 20, yPos);
-        yPos += 6;
+        yPos += 8;
       }
       if (location.contact.email) {
         doc.text(`Email: ${location.contact.email}`, 20, yPos);
-        yPos += 6;
+        yPos += 8;
       }
       if (location.contact.website) {
         doc.text(`Website: ${location.contact.website}`, 20, yPos);
-        yPos += 6;
+        yPos += 8;
       }
     }
     
-    // Directions
+    // Directions - with proper text wrapping and page break checking
     if (location.directions.car || location.directions.train || location.directions.bus) {
       yPos += 15;
       doc.setFont('helvetica', 'bold');
       doc.text('Getting Here:', 20, yPos);
-      yPos += 8;
+      yPos += 10;
       doc.setFont('helvetica', 'normal');
       
       const directions = [];
-      if (location.directions.car) directions.push(`By Car: ${location.directions.car}`);
-      if (location.directions.train) directions.push(`By Train: ${location.directions.train}`);
-      if (location.directions.bus) directions.push(`By Bus: ${location.directions.bus}`);
-      if (location.parking.available) {
+      if (location.directions.car) {
+        const carText = `By Car: ${location.directions.car}`;
+        const carLines = doc.splitTextToSize(carText, 170);
+        directions.push(...carLines);
+      }
+      if (location.directions.train) {
+        const trainText = `By Train: ${location.directions.train}`;
+        const trainLines = doc.splitTextToSize(trainText, 170);
+        directions.push(...trainLines);
+      }
+      if (location.directions.bus) {
+        const busText = `By Bus: ${location.directions.bus}`;
+        const busLines = doc.splitTextToSize(busText, 170);
+        directions.push(...busLines);
+      }
+      if (location.parking && location.parking.available) {
         const parkingInfo = `Parking: ${location.parking.cost || 'Available'}`;
         if (location.parking.restrictions) {
-          directions.push(`${parkingInfo} (${location.parking.restrictions})`);
+          const parkingText = `${parkingInfo} (${location.parking.restrictions})`;
+          const parkingLines = doc.splitTextToSize(parkingText, 170);
+          directions.push(...parkingLines);
         } else {
           directions.push(parkingInfo);
         }
       }
       
+      // Check if we have enough space for all directions
+      const totalDirectionsHeight = directions.length * 8;
+      if (yPos + totalDirectionsHeight > 250) {
+        // Not enough space, add a new page
+        doc.addPage();
+        doc.setFillColor(240, 248, 255);
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Venue & Directions (continued)', 20, 25);
+        yPos = 50;
+      }
+      
       directions.forEach(direction => {
         doc.text(direction, 20, yPos);
-        yPos += 6;
+        yPos += 8;
       });
     }
     
-    // Facilities
-    if (location.facilities.wifi || location.facilities.catering || location.facilities.audioVisual || location.facilities.accessibility) {
-      yPos += 15;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Available Facilities:', 20, yPos);
-      yPos += 8;
-      doc.setFont('helvetica', 'normal');
-      
+    // Facilities - check if we have enough space
+    if (location.facilities && (location.facilities.wifi || location.facilities.catering || location.facilities.audioVisual || location.facilities.accessibility)) {
       const facilities = [];
       if (location.facilities.wifi) facilities.push('WiFi available');
       if (location.facilities.catering) facilities.push('Catering provided');
       if (location.facilities.audioVisual) facilities.push('Audio/Visual equipment');
       if (location.facilities.accessibility) facilities.push('Accessibility features');
       
+      const facilitiesHeight = 15 + 10 + (facilities.length * 8); // Header + spacing + items
+      
+      if (yPos + facilitiesHeight > 250) {
+        // Not enough space, add a new page
+        doc.addPage();
+        doc.setFillColor(240, 248, 255);
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Venue & Directions (continued)', 20, 25);
+        yPos = 50;
+      }
+      
+      yPos += 15;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Available Facilities:', 20, yPos);
+      yPos += 10;
+      doc.setFont('helvetica', 'normal');
+      
       facilities.forEach(facility => {
         doc.text(`• ${facility}`, 20, yPos);
-        yPos += 6;
+        yPos += 8;
       });
     }
     
@@ -393,10 +462,25 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
     let pageCount = 0;
     
     faculty.forEach((member, index) => {
+      // Calculate how much space this faculty member will need
+      let memberHeight = 8 + 10 + 15; // Name + role + spacing
+      if (member.bio) {
+        const bioLines = doc.splitTextToSize(member.bio, 170);
+        memberHeight += bioLines.length * 8;
+      }
+      if (member.email) {
+        memberHeight += 16; // Email + spacing
+      }
+      
       // Check if we need a new page
-      if (yPos > 250) {
+      if (yPos + memberHeight > 250) {
         doc.addPage();
-        yPos = 20;
+        doc.setFillColor(240, 248, 255);
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Faculty Biographies (continued)', 20, 25);
+        yPos = 50;
         pageCount++;
       }
       
@@ -406,30 +490,30 @@ const ProspectusGenerator = ({ selectedCourse, onClose }) => {
       doc.text(member.name, 20, yPos);
       
       // Role
-      yPos += 6;
+      yPos += 8; // More space after name
       doc.setFontSize(12);
       doc.setFont('helvetica', 'italic');
       doc.text(member.role, 20, yPos);
       
       // Bio
-      yPos += 8;
+      yPos += 10; // More space after role
       doc.setFont('helvetica', 'normal');
       if (member.bio) {
         const bioLines = doc.splitTextToSize(member.bio, 170);
         bioLines.forEach(line => {
           doc.text(line, 20, yPos);
-          yPos += 5;
+          yPos += 8; // Increased line spacing
         });
       }
       
       // Contact info
       if (member.email) {
-        yPos += 3;
+        yPos += 8; // More space before contact
         doc.text(`Email: ${member.email}`, 20, yPos);
-        yPos += 5;
+        yPos += 8; // More space after contact
       }
       
-      yPos += 10; // Space between faculty members
+      yPos += 15; // More space between faculty members
     });
     
     doc.addPage();

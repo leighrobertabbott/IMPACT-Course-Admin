@@ -40,8 +40,25 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 | `ProgrammeBuilderModal.jsx` | Course programme creation | Drag-drop programme builder | Course management | ✅ |
 | `EnhancedProgrammeDisplay.jsx` | Programme visualization | Interactive programme display | Candidate dashboard | ✅ |
 | `FacultyManagementModal.jsx` | Faculty member management | Faculty CRUD operations | Admin panel | ✅ |
+| `MentorAssignmentModal.jsx` | Course-specific mentor assignments | Mentor assignment to course groups (A, B, C, D) | Admin panel | ✅ |
 | `ProspectusGenerator.jsx` | Course prospectus generation | PDF prospectus creation with course details | Admin panel, Course management | ✅ |
 | `LocationManagementModal.jsx` | Venue location management | Location CRUD with photo uploads and venue details | Admin panel | ✅ |
+
+### Faculty-Course Association System
+
+| Component | Purpose | Assignment Type | Scope | Usage |
+|-----------|---------|----------------|-------|-------|
+| `FacultyManagementModal.jsx` | Global faculty creation | Global faculty pool | System-wide | Admin panel - creates faculty members |
+| `assignFacultyToSubject()` | Subject-level assignments | Programme subjects | Course-specific | Course Manager & Admin Panel - assigns faculty to subjects |
+| `MentorAssignmentModal.jsx` | Mentor assignments | Course groups (A, B, C, D) | Course-specific | Admin Panel - assigns mentors to course groups |
+| `FacultyDashboard.jsx` | Faculty view assignments | Display assigned subjects | Faculty perspective | Faculty members - view their assignments |
+
+**Key Concepts:**
+- **Global Faculty Pool**: Faculty members exist globally and can be assigned to subjects across multiple courses
+- **Subject-Level Assignments**: Faculty are assigned to specific programme subjects, not directly to courses
+- **Course Manager vs Admin Panel**: Course Manager handles subject assignments within selected course; Admin Panel handles global faculty creation + mentor assignments
+- **Mentor System**: Separate from subject assignments, mentors are assigned to course groups for candidate mentoring
+- **Faculty Dashboard**: Shows assigned subjects across all active courses where faculty have subject assignments
 
 ### Pages (`src/pages/`)
 
@@ -216,3 +233,10 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 - **`src/components/ProspectusGenerator.jsx`** - Dynamic prospectus generation with location integration
 - **Firebase Storage** - Photo storage with access control and cleanup
 - **Firestore Collections** - `locations` collection for venue data management
+
+### Faculty & Course Association Management
+- **`src/components/FacultyManagementModal.jsx`** - Global faculty creation and management
+- **`src/components/MentorAssignmentModal.jsx`** - Course-specific mentor assignments to groups
+- **`assignFacultyToSubject()`** - Subject-level faculty assignments in Course Manager and Admin Panel
+- **`src/pages/FacultyDashboard.jsx`** - Faculty view of assigned subjects and mentor roles
+- **Firestore Collections** - `faculty` (global pool), `programmeSubjects.assignedFaculty` (subject assignments), `courses.mentorAssignments` (mentor assignments)

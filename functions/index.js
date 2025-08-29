@@ -1888,3 +1888,175 @@ exports.getFirebaseConfig = onCall(async (request) => {
     throw new Error(error.message || 'Failed to get Firebase config');
   }
 });
+
+// Purge all faculty accounts (DEBUG ONLY)
+exports.purgeAllFaculty = onCall(async (request) => {
+  try {
+    console.log('Starting faculty purge...');
+
+    // Get all faculty members from Firestore
+    const facultySnapshot = await db.collection('faculty').get();
+    const facultyMembers = facultySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    console.log(`Found ${facultyMembers.length} faculty members to purge`);
+
+    let deletedCount = 0;
+    let errors = [];
+
+    for (const faculty of facultyMembers) {
+      try {
+        console.log(`Deleting faculty: ${faculty.email}`);
+
+        // Find the user by email in Firebase Auth
+        const userRecord = await admin.auth().getUserByEmail(faculty.email);
+        
+        if (userRecord) {
+          // Delete the Firebase Auth user account
+          await admin.auth().deleteUser(userRecord.uid);
+          console.log(`Firebase Auth user deleted: ${userRecord.uid}`);
+          
+          // Delete the user profile from Firestore
+          try {
+            await db.collection('users').doc(userRecord.uid).delete();
+            console.log(`User profile deleted from Firestore: ${userRecord.uid}`);
+          } catch (firestoreError) {
+            console.warn(`User profile not found in Firestore: ${firestoreError.message}`);
+          }
+        } else {
+          console.warn(`Firebase Auth user not found for email: ${faculty.email}`);
+        }
+
+        // Delete the faculty profile from Firestore
+        await db.collection('faculty').doc(faculty.id).delete();
+        console.log(`Faculty profile deleted from Firestore: ${faculty.id}`);
+
+        deletedCount++;
+      } catch (error) {
+        console.error(`Error deleting faculty ${faculty.email}:`, error);
+        errors.push(`${faculty.email}: ${error.message}`);
+      }
+    }
+
+    console.log(`Faculty purge completed. Deleted ${deletedCount} faculty members.`);
+
+    return { 
+      success: true, 
+      message: `Purged ${deletedCount} faculty accounts successfully`,
+      deletedCount,
+      errors: errors.length > 0 ? errors : null
+    };
+
+  } catch (error) {
+    console.error('Error purging faculty accounts:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to purge faculty accounts' 
+    };
+  }
+});
+
+// Create faculty account using Admin SDK (secure, doesn't affect current session)
+exports.createFacultyAccount = onCall(async (request) => {
+  try {
+    const { email, name, facultyId } = request.data;
+    
+    if (!email || !name || !facultyId) {
+      throw new Error('Email, name, and facultyId are required');
+    }
+
+    console.log(`Creating faculty account for: ${email}`);
+
+    // Generate a secure temporary password
+    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+
+    // Create user account using Admin SDK (this won't affect the current session)
+    const userRecord = await admin.auth().createUser({
+      email: email,
+      password: tempPassword,
+      displayName: name,
+      emailVerified: false
+    });
+
+    console.log('User account created successfully:', userRecord.uid);
+
+    // Create user profile in Firestore with UID as document ID
+    await db.collection('users').doc(userRecord.uid).set({
+      uid: userRecord.uid,
+      email: email,
+      name: name,
+      role: 'faculty',
+      facultyId: facultyId,
+      createdAt: new Date(),
+      status: 'active'
+    });
+
+    console.log('User profile created in Firestore');
+
+    // Send email with login credentials
+    const emailResult = await sendEmail(
+      email,
+      'IMPACT Course - Faculty Account Created',
+      `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2c3e50;">Welcome to IMPACT Course Faculty</h2>
+          <p>Hello ${name},</p>
+          <p>Your faculty account has been created successfully. Here are your login credentials:</p>
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+          </div>
+          <p><strong>Important:</strong> Please change your password after your first login for security.</p>
+          <p>You can access the system at: <a href="https://mwl-impact.web.app">https://mwl-impact.web.app</a></p>
+          <p>If you have any questions, please contact the course administrator.</p>
+          <p>Best regards,<br>IMPACT Course Team</p>
+        </div>
+      `
+    );
+
+    if (emailResult) {
+      console.log('Faculty credentials email sent successfully');
+      return { 
+        success: true, 
+        message: 'Faculty account created successfully',
+        uid: userRecord.uid
+      };
+    } else {
+      console.warn('Faculty account created but email failed to send');
+      return { 
+        success: true, 
+        message: 'Faculty account created but email failed to send',
+        uid: userRecord.uid,
+        tempPassword: tempPassword // Return password so admin can manually send it
+      };
+    }
+
+  } catch (error) {
+    console.error('Error creating faculty account:', error);
+    
+    // Handle specific Firebase Auth errors
+    if (error.code === 'auth/email-already-exists') {
+      return { 
+        success: false, 
+        error: 'A user with this email already exists' 
+      };
+    } else if (error.code === 'auth/invalid-email') {
+      return { 
+        success: false, 
+        error: 'Invalid email address' 
+      };
+    } else if (error.code === 'auth/weak-password') {
+      return { 
+        success: false, 
+        error: 'Password is too weak' 
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: error.message || 'Failed to create faculty account' 
+    };
+  }
+});

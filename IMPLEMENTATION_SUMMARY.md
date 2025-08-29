@@ -2,7 +2,7 @@
 
 ## 🎯 System Overview
 
-The IMPACT Course Management System is a comprehensive web application designed to manage the entire lifecycle of the IMPACT (Interventional Management of Patients with Acute Coronary Thrombosis) course at Whiston Hospital. The system handles candidate applications, course management, faculty coordination, automated communications, and assessment tracking.
+The IMPACT Course Management System is a comprehensive web application designed to manage the entire lifecycle of the IMPACT (Ill Medical Patients' Acute Care and Treatment) course at Whiston Hospital. The system handles candidate applications, course management, faculty coordination, automated communications, and assessment tracking.
 
 ## 🏗 Architecture
 
@@ -82,6 +82,113 @@ The IMPACT Course Management System is a comprehensive web application designed 
   - System settings and configuration
   - Material upload and management
 
+## 🔄 Faculty-Course Association Workflow
+
+### **Overview**
+The faculty-course association system operates on multiple levels, allowing for flexible faculty management across courses while maintaining course-specific assignments.
+
+### **1. Global Faculty Pool**
+- **Creation**: Faculty members are created globally via `FacultyManagementModal` in Admin Panel
+- **Storage**: Stored in `faculty` collection with basic profile information
+- **Scope**: System-wide availability for assignment to any course
+- **Authentication**: Each faculty member gets a Firebase Auth account for login
+
+### **2. Subject-Level Assignments**
+- **Assignment**: Faculty are assigned to specific programme subjects via `assignFacultyToSubject()`
+- **Storage**: Stored in `programmeSubjects.assignedFaculty` array
+- **Scope**: Course-specific subject assignments
+- **Usage**: Both Course Manager and Admin Panel can assign faculty to subjects
+- **Faculty View**: Faculty see assigned subjects in their dashboard across all active courses
+
+### **3. Mentor System**
+- **Assignment**: Faculty can be assigned as mentors to course groups (A, B, C, D) via `MentorAssignmentModal`
+- **Storage**: Stored in `courses.mentorAssignments` object
+- **Scope**: Course-specific group mentoring
+- **Preferences**: Faculty can set mentor preferences in `faculty.mentorPreferences`
+- **Separation**: Mentor assignments are separate from subject teaching assignments
+
+### **4. Assignment Workflows**
+
+#### **Course Manager Faculty Assignment**
+```
+1. Select Course → Programme Tab → Select Subject
+2. Click "Assign Faculty" → Choose Faculty Member
+3. Faculty assigned to specific subject within that course
+4. Faculty sees assignment in their dashboard
+```
+
+#### **Admin Panel Faculty Assignment**
+```
+1. Admin Panel → Faculty Management → Add Faculty Member
+2. Faculty created globally in faculty collection
+3. Course Management → Select Course → Programme → Assign Faculty to Subjects
+4. Mentor Assignment → Select Course → Assign Mentors to Groups
+```
+
+#### **Faculty Dashboard View**
+```
+1. Faculty logs in → Faculty Dashboard
+2. System fetches all active courses
+3. System filters subjects where faculty.email matches assignedFaculty
+4. Faculty sees assigned subjects across all courses
+5. Faculty can set mentor preferences
+6. Faculty sees mentor assignments if any
+```
+
+### **5. Key Functions**
+
+#### **assignFacultyToSubject(subjectId, facultyId)**
+- **Location**: `CourseManagement.jsx` and `AdminPanel.jsx`
+- **Purpose**: Assign faculty to specific programme subjects
+- **Data**: Updates `programmeSubjects.assignedFaculty` array
+- **Validation**: Prevents duplicate assignments
+
+#### **fetchAssignedSubjects()**
+- **Location**: `FacultyDashboard.jsx`
+- **Purpose**: Get all subjects where faculty is assigned
+- **Logic**: Filters `programmeSubjects` by faculty email in `assignedFaculty`
+
+#### **MentorAssignmentModal**
+- **Location**: `AdminPanel.jsx`
+- **Purpose**: Assign mentors to course groups
+- **Data**: Updates `courses.mentorAssignments`
+- **Scope**: Course-specific group mentoring
+
+### **6. Data Relationships**
+
+```
+faculty (Global Pool)
+├── faculty.mentorPreferences (Global preferences)
+├── faculty.currentMentorAssignments (Current mentor roles)
+└── programmeSubjects.assignedFaculty (Subject teaching assignments)
+    └── programmeSubjects.courseId (Links to specific course)
+
+courses
+├── courses.mentorAssignments (Group mentor assignments)
+└── programmeSubjects (Subject assignments)
+    └── programmeSubjects.assignedFaculty (Faculty teaching subjects)
+```
+
+### **7. Common Scenarios**
+
+#### **New Faculty Member**
+1. Admin creates faculty via `FacultyManagementModal`
+2. Faculty gets Firebase Auth account
+3. Faculty logs in and sees empty dashboard (no assignments)
+4. Admin assigns faculty to subjects via Course Manager or Admin Panel
+5. Faculty sees assigned subjects in dashboard
+
+#### **Faculty Teaching Multiple Courses**
+1. Faculty can be assigned to subjects in multiple courses
+2. Faculty dashboard shows all assigned subjects across all active courses
+3. Each assignment is course-specific and subject-specific
+
+#### **Faculty as Mentor**
+1. Faculty sets mentor preferences in dashboard
+2. Admin assigns faculty as mentor to specific course groups
+3. Faculty sees mentor assignments separate from teaching assignments
+4. Mentor role is course-specific and group-specific
+
 ## 🗄 Database Schema
 
 ### **Core Collections**
@@ -140,13 +247,22 @@ The IMPACT Course Management System is a comprehensive web application designed 
   startDate: string,
   endDate: string,
   venue: string,
+  locationId?: string,
   maxCandidates: number,
-  candidateCount: number,
-  cost: string,
+  courseCost: string,
+  eLearningUrl: string,
+  description: string,
+  status: 'active' | 'completed' | 'cancelled',
   archived: boolean,
+  archivedAt?: Timestamp,
   createdAt: Timestamp,
-  eLearningUrl?: string,
-  programme?: ProgrammeItem[]
+  candidateCount: number,
+  mentorAssignments: {
+    groupA?: { facultyId: string, facultyName: string, facultyEmail: string },
+    groupB?: { facultyId: string, facultyName: string, facultyEmail: string },
+    groupC?: { facultyId: string, facultyName: string, facultyEmail: string },
+    groupD?: { facultyId: string, facultyName: string, facultyEmail: string }
+  }
 }
 ```
 
@@ -155,15 +271,26 @@ The IMPACT Course Management System is a comprehensive web application designed 
 {
   id: string,
   name: string,
+  role: string,
   email: string,
-  specialty: string,
-  subjects: string[],
-  userId?: string,
+  phone?: string,
+  specialty?: string,
   createdAt: Timestamp,
-  contactInfo?: {
-    phone?: string,
-    department?: string
-  }
+  status: 'active' | 'inactive',
+  deleted?: boolean,
+  deletedAt?: Timestamp,
+  mentorPreferences: {
+    isMentor: boolean,
+    preferredGroups: string[],
+    maxMentees: number,
+    specialties: string[],
+    availability: { day1: boolean, day2: boolean }
+  },
+  currentMentorAssignments: {
+    courseId: string,
+    assignedGroup: string,
+    menteeCount: number
+  }[]
 }
 ```
 
@@ -187,20 +314,68 @@ The IMPACT Course Management System is a comprehensive web application designed 
 ```typescript
 {
   id: string,
-  courseId: string,
   name: string,
-  type: 'lecture' | 'workshop' | 'break' | 'lunch',
+  type: 'session' | 'workshop' | 'practical' | 'assessment' | 'break' | 'lunch' | 'scenario-practice' | 'practical-session',
+  duration: number,
+  description: string,
+  day: number,
   startTime: string,
   endTime: string,
-  duration: number,
-  assignedFaculty: string[],
-  assignedMaterials: string[],
-  description?: string,
-  workshopRotation?: {
+  courseId: string,
+  courseName: string,
+  createdAt: Timestamp,
+  assignedFaculty: {
+    id: string,
+    name: string,
+    role: string,
+    email: string
+  }[],
+  assignedMaterials: {
+    id: string,
+    title: string,
+    fileName: string,
+    downloadURL: string
+  }[],
+  // Workshop rotation fields
+  isWorkshopRotation?: boolean,
+  rotationSequence?: number,
+  workshopIndex?: number,
+  totalWorkshops?: number,
+  totalRotations?: number,
+  rotationSchedule?: Array<{
+    rotation: number,
+    group: string,
     groups: string[],
-    subjects: string[],
-    rotationSequence: RotationItem[]
-  }
+    timeSlot: string
+  }>,
+  // Assessment and scenario practice fields
+  isAssessment?: boolean,
+  isScenarioPractice?: boolean,
+  isPracticalSession?: boolean,
+  numberOfStations?: number,
+  numberOfTimeSlots?: number,
+  timeSlotDuration?: number,
+  stationNames?: string[],
+  stationFaculty?: Array<Array<{
+    id: string,
+    name: string,
+    role: string,
+    email: string
+  }>>,
+  // Concurrent activity fields
+  concurrentActivityName?: string,
+  concurrentActivityFaculty?: {
+    id: string,
+    name: string,
+    role: string,
+    email: string
+  }[],
+  scenarioCandidatesFirst?: string,
+  concurrentCandidatesFirst?: string,
+  scenarioCandidatesSecond?: string,
+  concurrentCandidatesSecond?: string,
+  deleted?: boolean,
+  deletedAt?: Timestamp
 }
 ```
 

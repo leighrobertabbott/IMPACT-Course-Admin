@@ -66,28 +66,30 @@ const Header = () => {
             
             {currentUser ? (
               <>
-                {userProfile?.role === 'general-office' ? (
-                  <Link to="/general-office/tutorial" className="nav-link">
-                    Tutorial
-                  </Link>
-                ) : (
-                  <Link to="/dashboard" className="nav-link">
-                    Dashboard
-                  </Link>
-                )}
+                {/* Role-specific navigation links */}
                 {userProfile?.role === 'admin' && (
                   <Link to="/admin" className="nav-link">
                     Admin Panel
                   </Link>
                 )}
                 {userProfile?.role === 'general-office' && (
-                  <Link to="/general-office" className="nav-link">
-                    General Office Admin
-                  </Link>
+                  <>
+                    <Link to="/general-office/tutorial" className="nav-link">
+                      Tutorial
+                    </Link>
+                    <Link to="/general-office" className="nav-link">
+                      General Office Admin
+                    </Link>
+                  </>
                 )}
                 {userProfile?.role === 'faculty' && (
                   <Link to="/faculty" className="nav-link">
                     Faculty Dashboard
+                  </Link>
+                )}
+                {userProfile?.role === 'candidate' && (
+                  <Link to="/dashboard" className="nav-link">
+                    Dashboard
                   </Link>
                 )}
                 
@@ -172,23 +174,7 @@ const Header = () => {
                 
                 {currentUser && (
                   <>
-                    {userProfile?.role === 'general-office' ? (
-                      <Link 
-                        to="/general-office/tutorial" 
-                        className="block text-gray-700 hover:text-gray-900 font-medium transition-colors"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Tutorial
-                      </Link>
-                    ) : (
-                      <Link 
-                        to="/dashboard" 
-                        className="block text-gray-700 hover:text-gray-900 font-medium transition-colors"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Dashboard
-                      </Link>
-                    )}
+                    {/* Role-specific navigation links */}
                     {userProfile?.role === 'admin' && (
                       <Link 
                         to="/admin" 
@@ -199,13 +185,22 @@ const Header = () => {
                       </Link>
                     )}
                     {userProfile?.role === 'general-office' && (
-                      <Link 
-                        to="/general-office" 
-                        className="block text-gray-700 hover:text-gray-900 font-medium transition-colors"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        General Office Admin
-                      </Link>
+                      <>
+                        <Link 
+                          to="/general-office/tutorial" 
+                          className="block text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Tutorial
+                        </Link>
+                        <Link 
+                          to="/general-office" 
+                          className="block text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          General Office Admin
+                        </Link>
+                      </>
                     )}
                     {userProfile?.role === 'faculty' && (
                       <Link 
@@ -214,6 +209,15 @@ const Header = () => {
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Faculty Dashboard
+                      </Link>
+                    )}
+                    {userProfile?.role === 'candidate' && (
+                      <Link 
+                        to="/dashboard" 
+                        className="block text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Dashboard
                       </Link>
                     )}
                   </>

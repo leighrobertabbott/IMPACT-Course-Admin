@@ -69,15 +69,15 @@ const LandingPage = () => {
                </Link>
              </div>
              
-             {/* Small link to get your own system */}
-             <div className="mt-6 text-center">
+             {/* Small link to get your own system - HIDDEN FOR NOW */}
+             {/* <div className="mt-6 text-center">
                <Link 
                  to="/get-your-own-system" 
                  className="text-white/80 hover:text-white text-sm underline transition-colors"
                >
                  Want to run IMPACT courses at your hospital? Get your own system →
                </Link>
-             </div>
+             </div> */}
           </div>
         </div>
       </section>

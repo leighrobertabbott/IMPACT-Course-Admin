@@ -318,7 +318,7 @@ const EnhancedProgrammeDisplay = ({ courseId, candidateData }) => {
                 <Users className="mr-4" size={40} />
                 Workshops (40 minutes each)
               </h4>
-              <p className="text-xl text-green-100 mt-2">Interactive skill development sessions</p>
+              <p className="text-xl text-green-100 mt-2">Interactive skill development sessions - Groups rotate through specific workshops</p>
             </div>
           </div>
           
@@ -358,9 +358,12 @@ const EnhancedProgrammeDisplay = ({ courseId, candidateData }) => {
                                 </span>
                               </div>
                               {session.assignedGroup && (
-                                <span className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-xs font-bold text-white">
-                                  {session.assignedGroup}
-                                </span>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-400">Group</span>
+                                  <span className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-xs font-bold text-white">
+                                    {session.assignedGroup}
+                                  </span>
+                                </div>
                               )}
                             </div>
                           ))}
@@ -385,7 +388,7 @@ const EnhancedProgrammeDisplay = ({ courseId, candidateData }) => {
                 <BookOpen className="mr-4" size={40} />
                 Sessions
               </h4>
-              <p className="text-xl text-blue-100 mt-2">Educational presentations and discussions</p>
+              <p className="text-xl text-blue-100 mt-2">Educational presentations and discussions - All groups attend</p>
             </div>
           </div>
           
@@ -419,6 +422,12 @@ const EnhancedProgrammeDisplay = ({ courseId, candidateData }) => {
                         <div className="text-white font-medium">
                           {session.room || 'To Be Directed'}
                         </div>
+                        <div className="text-sm text-gray-400 mt-2">Groups</div>
+                        <div className="flex justify-end mt-1">
+                          <span className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-xs font-bold text-white">
+                            All Groups
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -427,6 +436,53 @@ const EnhancedProgrammeDisplay = ({ courseId, candidateData }) => {
           </div>
         </div>
       )}
+
+      {/* Group Assignment Legend */}
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl overflow-hidden shadow-2xl border border-gray-700">
+        <div className="bg-gradient-to-r from-purple-600 to-pink-700 p-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20"></div>
+          <div className="relative z-10">
+            <h4 className="text-2xl font-bold text-white flex items-center">
+              <Users className="mr-3" size={28} />
+              Group Assignment Guide
+            </h4>
+            <p className="text-purple-100 mt-1">Understanding which sessions you'll attend</p>
+          </div>
+        </div>
+        
+        <div className="p-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                <span className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-xs font-bold text-white">
+                  All Groups
+                </span>
+                <span className="text-gray-300">Sessions, Assessments, Practical Sessions</span>
+              </div>
+              <div className="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                <span className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-xs font-bold text-white">
+                  Group A
+                </span>
+                <span className="text-gray-300">Workshop rotations (specific times)</span>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                <span className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-xs font-bold text-white">
+                  Group B
+                </span>
+                <span className="text-gray-300">Workshop rotations (specific times)</span>
+              </div>
+              <div className="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                <span className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full text-xs font-bold text-white">
+                  Groups C & D
+                </span>
+                <span className="text-gray-300">Workshop rotations (specific times)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Enhanced Programme Notes */}
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 text-white p-8 rounded-3xl shadow-2xl border border-gray-700 relative overflow-hidden">

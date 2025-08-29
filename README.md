@@ -1,6 +1,6 @@
 # IMPACT Course Management System
 
-A comprehensive web application for managing the IMPACT (Interventional Management of Patients with Acute Coronary Thrombosis) Course at Whiston Hospital. Built with React, Firebase, and Tailwind CSS, featuring advanced course management, candidate tracking, and automated prospectus generation.
+A comprehensive web application for managing the IMPACT (Ill Medical Patients' Acute Care and Treatment) Course at Whiston Hospital. Built with React, Firebase, and Tailwind CSS, featuring advanced course management, candidate tracking, and automated prospectus generation.
 
 ![IMPACT Course System](https://img.shields.io/badge/React-18-blue?style=for-the-badge&logo=react)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud-orange?style=for-the-badge&logo=firebase)
@@ -39,9 +39,13 @@ A comprehensive web application for managing the IMPACT (Interventional Manageme
 
 ### **🏥 Faculty Management**
 - Complete faculty member lifecycle management (CRUD operations)
-- Manage faculty assignments to course sessions and workshops
+- **Subject-level assignments** to specific course sessions and workshops
+- **Course-specific mentor assignments** for group mentoring (A, B, C, D)
+- **Global faculty pool** with course-specific subject assignments
+- **Mentor preferences system** allowing faculty to opt-in for mentoring roles
 - Track faculty credentials, availability, and specializations
 - Automated faculty notification system with email templates
+- **Faculty dashboard** showing assigned subjects across all active courses
 
 ### **📍 Location Management** *(NEW)*
 - **Comprehensive venue management** with detailed location information

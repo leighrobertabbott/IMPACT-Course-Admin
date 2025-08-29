@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Trash2, Mail, Phone, User, Award } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, query, where, getDocs } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
+import { fetchSignInMethodsForEmail } from 'firebase/auth';
 import { db, auth } from '../firebase/config';
 import { cloudFunctions } from '../utils/cloudFunctions';
 import toast from 'react-hot-toast';
@@ -33,8 +33,24 @@ const FacultyManagementModal = ({
     }
   }, [isOpen]);
 
+  // Email validation function
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const checkEmailExists = async (email) => {
-    if (!email || email.length < 3) return;
+    if (!email || email.length < 3) {
+      setEmailExists(false);
+      return;
+    }
+    
+    // Validate email format first
+    if (!isValidEmail(email)) {
+      setEmailExists(false);
+      setCheckingEmail(false);
+      return;
+    }
     
     setCheckingEmail(true);
     try {
@@ -51,6 +67,7 @@ const FacultyManagementModal = ({
       setEmailExists(signInMethods.length > 0);
     } catch (error) {
       console.error('Error checking email:', error);
+      // Don't set emailExists to true on error - let the user proceed
       setEmailExists(false);
     } finally {
       setCheckingEmail(false);
@@ -65,6 +82,12 @@ const FacultyManagementModal = ({
       
       if (!facultyForm.name || !facultyForm.email || !facultyForm.role) {
         toast.error('Please fill in all required fields');
+        return;
+      }
+
+      // Validate email format
+      if (!isValidEmail(facultyForm.email)) {
+        toast.error('Please enter a valid email address');
         return;
       }
 
@@ -87,12 +110,20 @@ const FacultyManagementModal = ({
         // Continue with the process even if we can't check
       }
 
-      // Create faculty profile
-      const facultyDoc = await addDoc(collection(db, 'faculty'), {
-        ...facultyForm,
-        createdAt: new Date(),
-        status: 'active'
-      });
+      // Create faculty profile first
+      let facultyDoc;
+      try {
+        facultyDoc = await addDoc(collection(db, 'faculty'), {
+          ...facultyForm,
+          createdAt: new Date(),
+          status: 'active'
+        });
+        console.log('Faculty profile created successfully:', facultyDoc.id);
+      } catch (firestoreError) {
+        console.error('Error creating faculty profile:', firestoreError);
+        toast.error('Failed to create faculty profile. Please check your permissions.');
+        return;
+      }
 
       if (existingUser) {
         // User exists but wasn't in faculty collection - just update their role
@@ -118,42 +149,24 @@ const FacultyManagementModal = ({
           toast.success(`Faculty member added successfully! ${facultyForm.email} already had a user account.`);
         }
       } else {
-        // Create new user account for faculty member
+        // Create new user account for faculty member using Cloud Function
         try {
-          // Generate a temporary password for faculty member
-          const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+          console.log('Creating user account for:', facultyForm.email);
           
-          const userCredential = await createUserWithEmailAndPassword(
-            auth, 
-            facultyForm.email, 
-            tempPassword
-          );
-
-          // Create user profile
-          await addDoc(collection(db, 'users'), {
-            uid: userCredential.user.uid,
+          // Use Cloud Function to create user account (this won't affect current session)
+          const { createFacultyAccount } = cloudFunctions;
+          const result = await createFacultyAccount({
             email: facultyForm.email,
             name: facultyForm.name,
-            role: 'faculty',
-            facultyId: facultyDoc.id,
-            createdAt: new Date(),
-            status: 'active'
+            facultyId: facultyDoc.id
           });
 
-          toast.success(`Faculty member added successfully! Login credentials sent to ${facultyForm.email}`);
-          
-          // Send email with login credentials via Cloud Function
-          try {
-            const { sendFacultyCredentials } = cloudFunctions;
-            await sendFacultyCredentials({
-              email: facultyForm.email,
-              name: facultyForm.name,
-              password: tempPassword
-            });
-          } catch (emailError) {
-            console.error('Error sending faculty credentials email:', emailError);
-            // Still show success but note that email wasn't sent
-            toast.success(`Faculty member added successfully! Please manually send login credentials to ${facultyForm.email}`);
+          if (result && result.success) {
+            console.log('User account created successfully via Cloud Function');
+            toast.success(`Faculty member added successfully! Login credentials sent to ${facultyForm.email}`);
+          } else {
+            console.error('Cloud Function failed to create user account:', result?.error);
+            toast.success('Faculty member added, but user account creation failed. Please contact the faculty member directly.');
           }
           
         } catch (authError) {

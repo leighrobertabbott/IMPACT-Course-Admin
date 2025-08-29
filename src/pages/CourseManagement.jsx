@@ -46,6 +46,7 @@ import {
 import ProgrammeBuilderModal from '../components/ProgrammeBuilderModal';
 import FacultyManagementModal from '../components/FacultyManagementModal';
 import ProspectusGenerator from '../components/ProspectusGenerator';
+import ProgrammeGenerator from '../components/ProgrammeGenerator';
 
 const CourseManagement = () => {
   // Navigation state
@@ -66,12 +67,14 @@ const CourseManagement = () => {
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
   const [showUploadMaterialsModal, setShowUploadMaterialsModal] = useState(false);
   const [showProspectusGenerator, setShowProspectusGenerator] = useState(false);
+  const [showProgrammeGenerator, setShowProgrammeGenerator] = useState(false);
   const [materialsForm, setMaterialsForm] = useState({
     title: '',
     description: '',
     file: null
   });
   const [courseMaterials, setCourseMaterials] = useState([]);
+  const [locations, setLocations] = useState([]);
 
   // Predefined workshop subjects for rotation
   const predefinedWorkshopSubjects = [
@@ -180,6 +183,7 @@ const CourseManagement = () => {
     startDate: '',
     endDate: '',
     venue: '',
+    locationId: '',
     maxCandidates: 20,
     courseCost: '',
     eLearningUrl: '',
@@ -196,6 +200,13 @@ const CourseManagement = () => {
     subjects: []
   });
 
+  const [showEditSubjectModal, setShowEditSubjectModal] = useState(false);
+  const [editingSubject, setEditingSubject] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: ''
+  });
+
   useEffect(() => {
     fetchAllCourses();
     fetchCourseData();
@@ -204,6 +215,7 @@ const CourseManagement = () => {
     fetchCourseMaterials();
     fetchProgrammeSubjects();
     fetchProgrammeTemplates();
+    fetchLocations();
   }, []);
 
   useEffect(() => {
@@ -306,6 +318,23 @@ const CourseManagement = () => {
       // Don't show error toast for permission issues during initial load
       if (error.code !== 'permission-denied') {
         toast.error('Failed to fetch course materials');
+      }
+    }
+  };
+
+  const fetchLocations = async () => {
+    try {
+      const locationsSnapshot = await getDocs(collection(db, 'locations'));
+      const locationsData = locationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setLocations(locationsData);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+      // Don't show error toast for permission issues during initial load
+      if (error.code !== 'permission-denied') {
+        toast.error('Failed to fetch locations');
       }
     }
   };
@@ -1110,6 +1139,41 @@ const CourseManagement = () => {
     }
   };
 
+  const editProgrammeSubject = async (subject) => {
+    setEditingSubject(subject);
+    setEditForm({
+      name: subject.name,
+      description: subject.description
+    });
+    setShowEditSubjectModal(true);
+  };
+
+  const updateProgrammeSubject = async () => {
+    if (!editingSubject || !editForm.name.trim()) {
+      toast.error('Please provide a subject name');
+      return;
+    }
+
+    try {
+      // Only allow safe fields to be updated
+      const safeUpdates = {
+        name: editForm.name.trim(),
+        description: editForm.description.trim()
+      };
+
+      await updateDoc(doc(db, 'programmeSubjects', editingSubject.id), safeUpdates);
+      
+      toast.success('Subject updated successfully');
+      setShowEditSubjectModal(false);
+      setEditingSubject(null);
+      setEditForm({ name: '', description: '' });
+      fetchProgrammeSubjects();
+    } catch (error) {
+      console.error('Error updating subject:', error);
+      toast.error('Failed to update subject');
+    }
+  };
+
   // Manual cleanup function for admin use
   const performCleanup = async () => {
     const confirmed = window.confirm(
@@ -1596,6 +1660,7 @@ const CourseManagement = () => {
                        startDate: selectedCourse.startDate || '',
                        endDate: selectedCourse.endDate || '',
                        venue: selectedCourse.venue || '',
+                       locationId: selectedCourse.locationId || '',
                        maxCandidates: selectedCourse.maxCandidates || 20,
                        courseCost: selectedCourse.courseCost || '',
                        eLearningUrl: selectedCourse.eLearningUrl || '',
@@ -1876,9 +1941,15 @@ const CourseManagement = () => {
                               subject.type === 'practical-session' ? 'Practical Session' :
                               subject.type.charAt(0).toUpperCase() + subject.type.slice(1)}
                            </span>
-                           {subject.isWorkshopRotation && (
-                             <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                           
+                           {/* Group Assignment Badges */}
+                           {subject.isWorkshopRotation ? (
+                             <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
                                Group {getWorkshopGroups(subject)}
+                             </span>
+                           ) : (
+                             <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                               All Groups
                              </span>
                            )}
                            {subject.isAssessment && (
@@ -2130,8 +2201,16 @@ const CourseManagement = () => {
                           )}
                        </div>
                        <button
+                         onClick={() => editProgrammeSubject(subject)}
+                         className="text-nhs-blue hover:text-nhs-dark-blue ml-2"
+                         title="Edit subject name and description"
+                       >
+                         <Edit size={16} />
+                       </button>
+                       <button
                          onClick={() => deleteProgrammeSubject(subject.id)}
                          className="text-red-500 hover:text-red-700 ml-2"
+                         title="Delete subject"
                        >
                          <Trash2 size={16} />
                        </button>
@@ -2479,6 +2558,13 @@ const CourseManagement = () => {
                 <FileText size={20} />
                 <span>Generate Course Prospectus</span>
               </button>
+              <button
+                onClick={() => setShowProgrammeGenerator(true)}
+                className="flex items-center space-x-3 p-3 bg-nhs-green text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Calendar size={20} />
+                <span>Generate Course Programme</span>
+              </button>
             </div>
           </div>
 
@@ -2571,6 +2657,14 @@ const CourseManagement = () => {
         <ProspectusGenerator
           selectedCourse={selectedCourse}
           onClose={() => setShowProspectusGenerator(false)}
+        />
+      )}
+
+      {/* Programme Generator Modal */}
+      {showProgrammeGenerator && (
+        <ProgrammeGenerator
+          selectedCourse={selectedCourse}
+          onClose={() => setShowProgrammeGenerator(false)}
         />
       )}
 
@@ -2844,6 +2938,23 @@ const CourseManagement = () => {
                   onChange={(e) => setCourseSettings(prev => ({ ...prev, venue: e.target.value }))}
                   className="w-full p-2 border border-gray-300 rounded-md"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                  Location
+                </label>
+                <select
+                  value={courseSettings.locationId || ''}
+                  onChange={(e) => setCourseSettings(prev => ({ ...prev, locationId: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select a location</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
@@ -3315,6 +3426,73 @@ const CourseManagement = () => {
                  <strong>Template Independence:</strong> When you load a template, it creates an independent copy for this course. 
                  You can modify faculty assignments, materials, and programme details without affecting other courses or the original template.
                </p>
+             </div>
+           </div>
+         </div>
+       )}
+
+       {/* Edit Subject Modal */}
+       {showEditSubjectModal && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+           <div className="bg-white rounded-lg p-6 w-full max-w-md">
+             <div className="flex justify-between items-center mb-4">
+               <h3 className="text-lg font-semibold text-nhs-dark-grey">Edit Subject</h3>
+               <button
+                 onClick={() => setShowEditSubjectModal(false)}
+                 className="text-gray-500 hover:text-gray-700"
+               >
+                 <X size={20} />
+               </button>
+             </div>
+             
+             <div className="space-y-4">
+               <div>
+                 <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                   Subject Name *
+                 </label>
+                 <input
+                   type="text"
+                   value={editForm.name}
+                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-nhs-blue focus:border-transparent"
+                   placeholder="Enter subject name"
+                 />
+               </div>
+               
+               <div>
+                 <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
+                   Description
+                 </label>
+                 <textarea
+                   value={editForm.description}
+                   onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-nhs-blue focus:border-transparent"
+                   placeholder="Enter subject description"
+                   rows={3}
+                 />
+               </div>
+               
+               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                 <p className="text-sm text-blue-800">
+                   <strong>Note:</strong> You can only edit the subject name and description. 
+                   Other fields like timing, type, and workshop rotations cannot be modified to maintain data integrity.
+                 </p>
+               </div>
+             </div>
+             
+             <div className="flex space-x-3 mt-6">
+               <button
+                 onClick={updateProgrammeSubject}
+                 className="bg-nhs-blue text-white px-4 py-2 rounded-md hover:bg-nhs-dark-blue"
+               >
+                 Update Subject
+               </button>
+               <button
+                 onClick={() => setShowEditSubjectModal(false)}
+                 className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+               >
+                 Cancel
+               </button>
              </div>
            </div>
          </div>
