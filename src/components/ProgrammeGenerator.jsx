@@ -184,8 +184,8 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
 
     // Get day-specific programme items
     const getDayProgramme = (day) => {
-      // Include ALL programme items for the day, including workshops
-      return programme.filter(item => item.day === day);
+      // Exclude workshop rotations from main schedule - they go in separate section
+      return programme.filter(item => item.day === day && !item.isWorkshopRotation);
     };
 
     const getWorkshopRotations = (day) => {
@@ -324,19 +324,9 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
       let html = '';
       
       dayProgramme.forEach((session, index) => {
-        if (session.isWorkshopRotation && session.rotationSchedule) {
-          // For workshop rotations, expand into individual time slots
-          session.rotationSchedule.forEach((rotation, rotationIndex) => {
-            const timeSlot = calculateTimeSlot(session.startTime, rotationIndex, session.workshopDuration || 40);
-            const groups = rotation.groups ? rotation.groups.join(', ') : rotation.group;
-            html += `
-                <tr><td>${timeSlot}</td><td>${rotation.workshop} (Groups ${groups})</td><td>${getFacultyNames(session)}</td><td>${getRoom(session)}</td></tr>`;
-          });
-        } else {
-          // Regular session
-          html += `
-              <tr><td>${formatTime(session.startTime)}</td><td>${session.name}</td><td>${getFacultyNames(session)}</td><td>${getRoom(session)}</td></tr>`;
-        }
+        // Regular session - no workshop rotation expansion
+        html += `
+            <tr><td>${formatTime(session.startTime)}</td><td>${session.name}</td><td>${getFacultyNames(session)}</td><td>${getRoom(session)}</td></tr>`;
       });
       
       return html;
@@ -555,7 +545,12 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
           </tbody>
         </table>
 
-        <!-- Assessment Stations 4-up (only if not already in main schedule) -->
+        <!-- Workshops 4-up -->
+        <div class="four-grid" style="margin-top:6mm">
+          ${generateWorkshopSchedule(getWorkshopRotations(1))}
+        </div>
+
+        <!-- Assessment Stations 4-up -->
         <div class="four-grid" style="margin-top:6mm">
           ${generateAssessmentSchedule(getAssessmentStations(1))}
         </div>
@@ -580,7 +575,12 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
           ${generateAssessmentSchedule(getPracticalSessions(2))}
         </div>
 
-        <!-- Assessment Stations 4-up (only if not already in main schedule) -->
+        <!-- Workshops 2-up -->
+        <div class="four-grid" style="grid-template-columns:1fr 1fr; gap:6mm; margin-top:6mm">
+          ${generateWorkshopSchedule(getWorkshopRotations(2))}
+        </div>
+
+        <!-- Assessment Stations 4-up -->
         <div class="four-grid" style="margin-top:6mm">
           ${generateAssessmentSchedule(getAssessmentStations(2))}
         </div>
