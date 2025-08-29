@@ -324,54 +324,83 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
       return html;
     };
 
-    // Generate day schedule table with integrated workshops as visual blocks
-    const generateDaySchedule = (day) => {
-      const dayProgramme = getDayProgramme(day);
-      let html = '';
-      let tableOpen = false;
-      
-      dayProgramme.forEach((session, index) => {
-        if (session.isWorkshopRotation && session.rotationSchedule) {
-          // Close table if it's open before workshop blocks
-          if (tableOpen) {
-            html += `
-            </tbody>
-          </table>`;
-            tableOpen = false;
-          }
-          
-          // Generate workshop blocks that visually interrupt the schedule
-          html += `
-          <!-- Workshop Blocks -->
-          <div class="four-grid" style="margin:6mm 0">
-            ${generateWorkshopSchedule([session])}
-          </div>`;
-          
-        } else {
-          // Regular session - ensure table is open
-          if (!tableOpen) {
-            html += `
-          <table class="sched-4col">
-            <colgroup><col/><col/><col/><col/></colgroup>
-            <thead><tr><th>Time</th><th>Session</th><th>Faculty</th><th>Room</th></tr></thead>
-            <tbody>`;
-            tableOpen = true;
-          }
-          
-          html += `
-              <tr><td>${formatTime(session.startTime)}</td><td>${session.name}</td><td>${getFacultyNames(session)}</td><td>${getRoom(session)}</td></tr>`;
-        }
-      });
-      
-      // Close table if it's still open
-      if (tableOpen) {
-        html += `
-            </tbody>
-          </table>`;
-      }
-      
-      return html;
-    };
+         // Generate day schedule table with integrated workshops as visual blocks
+     const generateDaySchedule = (day) => {
+       const dayProgramme = getDayProgramme(day);
+       let html = '';
+       let tableOpen = false;
+       
+       // Group workshops by their start time to display them side by side
+       const workshopsByTime = {};
+       const regularSessions = [];
+       
+       dayProgramme.forEach((session) => {
+         if (session.isWorkshopRotation && session.rotationSchedule) {
+           const startTime = session.startTime;
+           if (!workshopsByTime[startTime]) {
+             workshopsByTime[startTime] = [];
+           }
+           workshopsByTime[startTime].push(session);
+         } else {
+           regularSessions.push(session);
+         }
+       });
+       
+       // Process sessions in chronological order
+       const allSessions = [...regularSessions];
+       Object.keys(workshopsByTime).forEach(startTime => {
+         allSessions.push({
+           type: 'workshop-group',
+           startTime: startTime,
+           workshops: workshopsByTime[startTime]
+         });
+       });
+       
+       // Sort all sessions by start time
+       allSessions.sort((a, b) => a.startTime.localeCompare(b.startTime));
+       
+       allSessions.forEach((session) => {
+         if (session.type === 'workshop-group') {
+           // Close table if it's open before workshop blocks
+           if (tableOpen) {
+             html += `
+             </tbody>
+           </table>`;
+             tableOpen = false;
+           }
+           
+           // Generate workshop blocks that visually interrupt the schedule
+           html += `
+           <!-- Workshop Blocks -->
+           <div class="two-grid" style="margin:6mm 0">
+             ${generateWorkshopSchedule(session.workshops)}
+           </div>`;
+           
+         } else {
+           // Regular session - ensure table is open
+           if (!tableOpen) {
+             html += `
+           <table class="sched-4col">
+             <colgroup><col/><col/><col/><col/></colgroup>
+             <thead><tr><th>Time</th><th>Session</th><th>Faculty</th><th>Room</th></tr></thead>
+             <tbody>`;
+             tableOpen = true;
+           }
+           
+           html += `
+               <tr><td>${formatTime(session.startTime)}</td><td>${session.name}</td><td>${getFacultyNames(session)}</td><td>${getRoom(session)}</td></tr>`;
+         }
+       });
+       
+       // Close table if it's still open
+       if (tableOpen) {
+         html += `
+             </tbody>
+           </table>`;
+       }
+       
+       return html;
+     };
 
     const template = `
 <!doctype html>
@@ -452,8 +481,10 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
 
     .strip{padding:6px 8px; font-weight:var(--heading); color:#0b132b; background:linear-gradient(90deg, rgba(249,115,22,.18), rgba(6,182,212,.18)); border:1px solid var(--rule); border-radius:6px; margin-bottom:4mm}
 
-    /* Four-up blocks (Workshops / Stations) in exact grid */
-    .four-grid{display:grid; grid-template-columns: repeat(4, 1fr); gap:4mm}
+         /* Four-up blocks (Workshops / Stations) in exact grid */
+     .four-grid{display:grid; grid-template-columns: repeat(4, 1fr); gap:4mm}
+     /* Two-up blocks for workshop pairs */
+     .two-grid{display:grid; grid-template-columns: repeat(2, 1fr); gap:6mm}
     .tile{border:1px solid var(--rule); border-radius:var(--radius); overflow:hidden}
     .tile h5{margin:0; padding:6px 8px; font-weight:var(--heading); background:linear-gradient(90deg, rgba(139,92,246,.18), rgba(236,72,153,.18)); color:#3b0764}
     .tile table td, .tile table th{font-size:12px}
