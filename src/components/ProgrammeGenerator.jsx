@@ -234,6 +234,9 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
      const generateWorkshopSchedule = (workshops) => {
        if (!workshops || workshops.length === 0) return '';
        
+       // Debug: Log workshop data structure
+       console.log('Workshop data for generation:', workshops);
+       
        let html = '';
        workshops.forEach((workshop, index) => {
          html += `
@@ -242,21 +245,36 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
              <table>
                <tbody>`;
          
-         if (workshop.rotationSchedule) {
-           workshop.rotationSchedule.forEach((schedule, slotIndex) => {
-             // Calculate actual time instead of generic slot
-             const timeSlot = calculateTimeSlot(workshop.startTime, slotIndex, workshop.workshopDuration || 40);
-             const groups = schedule.groups ? schedule.groups.join(', ') : schedule.group;
-             
-             // Use the specific workshop subject name if available
-             const workshopName = workshop.selectedWorkshopSubjects && workshop.selectedWorkshopSubjects[slotIndex] 
-               ? workshop.selectedWorkshopSubjects[slotIndex] 
-               : workshop.name;
-             
-             html += `
-                 <tr><td>${timeSlot}</td><td>Group ${groups}</td></tr>`;
-           });
-         }
+                   if (workshop.rotationSchedule) {
+            workshop.rotationSchedule.forEach((schedule, slotIndex) => {
+              // Debug: Log schedule data
+              console.log(`Schedule ${slotIndex} for workshop ${workshop.name}:`, schedule);
+              
+              // Calculate actual time instead of generic slot
+              const timeSlot = calculateTimeSlot(workshop.startTime, slotIndex, workshop.workshopDuration || 40);
+              
+              // Handle different group data structures
+              let groups = 'TBD';
+              if (schedule.groups && Array.isArray(schedule.groups)) {
+                groups = schedule.groups.join(', ');
+              } else if (schedule.group) {
+                groups = schedule.group;
+              } else if (schedule.assignedGroups && Array.isArray(schedule.assignedGroups)) {
+                groups = schedule.assignedGroups.join(', ');
+              }
+              
+              // Debug: Log what groups we found
+              console.log(`Groups for slot ${slotIndex}:`, groups);
+              
+              // Use the specific workshop subject name if available
+              const workshopName = workshop.selectedWorkshopSubjects && workshop.selectedWorkshopSubjects[slotIndex] 
+                ? workshop.selectedWorkshopSubjects[slotIndex] 
+                : workshop.name;
+              
+              html += `
+                  <tr><td>${timeSlot}</td><td>Group ${groups}</td></tr>`;
+            });
+          }
          
          html += `
                </tbody>
