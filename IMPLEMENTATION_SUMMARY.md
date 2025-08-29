@@ -28,7 +28,142 @@ The IMPACT Course Management System is a comprehensive web application designed 
 - **Nodemailer** - Email sending via Cloud Functions
 - **Template System** - Dynamic email templates with variable substitution
 
-## 👥 User Role System
+## 📋 Programme Builder System
+
+### **Overview**
+The programme builder system provides a centralized, reusable approach to creating and managing course programmes with predefined subject lists and dynamic UI components.
+
+### **Core Components**
+
+#### **useProgrammeBuilder Hook** (`src/hooks/useProgrammeBuilder.js`)
+- **Purpose**: Centralized programme building logic and state management
+- **Key Features**:
+  - Programme subject CRUD operations (create, read, update, delete)
+  - Predefined subject lists for workshops, sessions, and practical activities
+  - Real-time data synchronization with Firestore
+  - Template management for reusable programme structures
+  - Workshop rotation management with automatic group assignments
+
+#### **Predefined Subject Lists**
+```javascript
+// Workshop rotation subjects (4 core subjects for rotation selection)
+const predefinedWorkshopSubjects = [
+  'Fluids and Transfusion',
+  'Lumbar Puncture and CSF Analysis', 
+  'Advanced Arrhythmia Management',
+  'Imaging and Radiology'
+];
+
+// Session subjects (16 standard sessions)
+const predefinedSessionSubjects = [
+  'Registration / Meeting for Faculty',
+  'Welcome and Introductions – Why IMPACT?',
+  'Faculty Demonstration followed by Initial Assessment',
+  'Triage and Resource Management',
+  'The Breathless Patient',
+  'Shock',
+  'Respiratory Support',
+  'Chest Pain',
+  'Acute Kidney Injury',
+  'Neurological Emergencies',
+  'Gastrointestinal Emergencies',
+  'Sugar & Salt',
+  'Retests / Mentor Feedback',
+  'Summary and Close',
+  'Break',
+  'Lunch'
+];
+
+// Practical subjects (16 practical activities)
+const predefinedPracticalSubjects = [
+  'Central Venous Cannulation',
+  'Thoracocentesis',
+  'Lumbar Puncture',
+  'Arterial Line Insertion',
+  'Chest Drain Insertion',
+  'Endotracheal Intubation',
+  'Supraglottic Airway Insertion',
+  'Needle Cricothyroidotomy',
+  'Pleural Aspiration',
+  'Abdominal Paracentesis',
+  'Joint Aspiration',
+  'Pericardiocentesis',
+  'Nasogastric Tube Insertion',
+  'Urinary Catheterisation',
+  'Peripheral IV Cannulation',
+  'Blood Gas Sampling'
+];
+```
+
+#### **ProgrammeBuilderModal Component** (`src/components/ProgrammeBuilderModal.jsx`)
+- **Purpose**: Reusable UI component for adding/editing programme subjects
+- **Key Features**:
+  - Dynamic subject selection with dropdown menus for sessions and practical activities
+  - Free-text input for workshop names, assessments, and practical sessions
+  - Fixed subject names for scenario-practice, break, and lunch (auto-filled and disabled)
+  - Predefined subject lists for sessions and practical activities
+  - Workshop rotation subjects selection for specific workshop content
+  - Form validation and error handling
+  - Integration with faculty assignment system
+  - Workshop rotation configuration
+
+#### **ProgrammeBuilderWrapper Component** (`src/components/ProgrammeBuilderWrapper.jsx`)
+- **Purpose**: Wrapper component that eliminates code duplication between Admin Panel and Course Management
+- **Key Features**:
+  - Integrates `useProgrammeBuilder` hook
+  - Passes predefined subject lists as props to `ProgrammeBuilderModal`
+  - Provides consistent interface for both Admin Panel and Course Management
+  - Maintains separation of concerns and reusability
+
+### **Data Flow**
+1. **Hook Integration**: `useProgrammeBuilder` provides predefined subjects and CRUD operations
+2. **Wrapper Component**: `ProgrammeBuilderWrapper` integrates hook and passes props
+3. **Modal Component**: `ProgrammeBuilderModal` renders UI with predefined subject dropdowns
+4. **User Selection**: Users select from predefined subjects based on subject type
+5. **Data Persistence**: Changes are saved to Firestore via hook operations
+
+### **Usage Patterns**
+
+#### **Admin Panel Integration**
+```javascript
+// AdminPanel.jsx
+import ProgrammeBuilderWrapper from '../components/ProgrammeBuilderWrapper';
+
+<ProgrammeBuilderWrapper
+  courseId={selectedCourse}
+  isOpen={showAddSubjectModal}
+  onClose={() => setShowAddSubjectModal(false)}
+  subjectForm={subjectForm}
+  setSubjectForm={setSubjectForm}
+  onAddSubject={addProgrammeSubject}
+/>
+```
+
+#### **Course Management Integration**
+```javascript
+// CourseManagement.jsx
+import ProgrammeBuilderWrapper from '../components/ProgrammeBuilderWrapper';
+
+<ProgrammeBuilderWrapper
+  courseId={selectedCourse}
+  isOpen={showAddSubjectModal}
+  onClose={() => setShowAddSubjectModal(false)}
+  subjectForm={subjectForm}
+  setSubjectForm={setSubjectForm}
+  onAddSubject={addProgrammeSubject}
+/>
+```
+
+### **Benefits**
+- **Consistency**: Standardized subject lists across all courses
+- **Efficiency**: Reduced data entry with predefined options and fixed names
+- **Maintainability**: Centralized logic in reusable hook
+- **Scalability**: Easy to add new predefined subjects
+- **User Experience**: Intuitive dropdown selection for sessions/practicals, free-text for workshops/assessments, fixed names for standard activities
+- **Workshop Flexibility**: Generic workshop names with specific subject selection in rotation configuration
+- **Simplified Workflow**: Fixed names for common activities (break, lunch, scenario-practice) reduce user input errors
+
+## �� User Role System
 
 ### **1. Public Users (Unauthenticated)**
 - **Access Level:** Landing page and application form

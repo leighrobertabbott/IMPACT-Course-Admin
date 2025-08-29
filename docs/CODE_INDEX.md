@@ -37,12 +37,19 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 | `ErrorBoundary.jsx` | Error handling wrapper | Error catching and display | App.jsx root wrapper | ✅ |
 | `PhotoRequirement.jsx` | Photo upload enforcement | Photo validation for candidates | Candidate dashboard/profile | ✅ |
 | `EmailTemplateManager.jsx` | Email template CRUD | Template management interface | Admin panel | ✅ |
-| `ProgrammeBuilderModal.jsx` | Course programme creation | Drag-drop programme builder | Course management | ✅ |
+| `ProgrammeBuilderModal.jsx` | Course programme creation | Drag-drop programme builder with mixed subject selection (dropdowns, free-text, fixed names) | Course management | ✅ |
+| `ProgrammeBuilderWrapper.jsx` | Programme builder integration | Hook integration and prop passing wrapper | Admin panel, Course management | ✅ |
 | `EnhancedProgrammeDisplay.jsx` | Programme visualization | Interactive programme display | Candidate dashboard | ✅ |
 | `FacultyManagementModal.jsx` | Faculty member management | Faculty CRUD operations | Admin panel | ✅ |
 | `MentorAssignmentModal.jsx` | Course-specific mentor assignments | Mentor assignment to course groups (A, B, C, D) | Admin panel | ✅ |
 | `ProspectusGenerator.jsx` | Course prospectus generation | PDF prospectus creation with course details | Admin panel, Course management | ✅ |
 | `LocationManagementModal.jsx` | Venue location management | Location CRUD with photo uploads and venue details | Admin panel | ✅ |
+
+### Hooks (`src/hooks/`)
+
+| Hook | Purpose | Key Exports | Usage | Single Source of Truth |
+|------|---------|-------------|-------|------------------------|
+| `useProgrammeBuilder.js` | Programme building logic | Programme subjects, predefined lists, CRUD operations | Programme builder system | ✅ |
 
 ### Faculty-Course Association System
 
@@ -150,6 +157,9 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 - **Location Management**: `LocationManagementModal.jsx` - Venue data management with photo uploads
 - **Prospectus Generation**: `ProspectusGenerator.jsx` - Dynamic PDF generation with location data
 - **Provisioning System**: `provisionApi.js` + Firebase Functions - Complete OAuth and Firebase project provisioning
+- **Programme Builder**: `useProgrammeBuilder.js` - Centralized programme building logic and predefined subjects
+- **Programme Builder UI**: `ProgrammeBuilderWrapper.jsx` - Reusable programme builder integration component
+- **Subject Naming**: Mixed approach - dropdowns for sessions/practicals, free-text for workshops/assessments/practical-sessions, fixed names for scenario-practice/break/lunch
 
 ### Data Flow Patterns
 1. **Authentication Flow**: Login → AuthContext → Protected Routes → Role-Based Redirects
@@ -159,6 +169,7 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 5. **Error Handling**: ErrorBoundary → User-Friendly Messages → Recovery Options
 6. **Location Management**: Admin Panel → Location CRUD → Firebase Storage (photos) → Prospectus Generation
 7. **Prospectus Generation**: Course Selection → Location Data → Faculty Data → Programme Data → PDF Generation
+8. **Programme Building**: useProgrammeBuilder Hook → ProgrammeBuilderWrapper → ProgrammeBuilderModal → Firestore
 
 ### Security Patterns
 - **Route Protection**: `ProtectedRoute.jsx` enforces role-based access with automatic redirects
@@ -240,3 +251,9 @@ This document provides a comprehensive index of the IMPACT Course Management Sys
 - **`assignFacultyToSubject()`** - Subject-level faculty assignments in Course Manager and Admin Panel
 - **`src/pages/FacultyDashboard.jsx`** - Faculty view of assigned subjects and mentor roles
 - **Firestore Collections** - `faculty` (global pool), `programmeSubjects.assignedFaculty` (subject assignments), `courses.mentorAssignments` (mentor assignments)
+
+### Programme Builder Management
+- **`src/hooks/useProgrammeBuilder.js`** - Centralized programme building logic, state management, and predefined subjects
+- **`src/components/ProgrammeBuilderModal.jsx`** - Shared programme builder UI component with mixed subject selection (dropdowns for sessions/practicals, free-text for workshops/assessments/practical-sessions, fixed names for scenario-practice/break/lunch)
+- **`src/components/ProgrammeBuilderWrapper.jsx`** - Reusable wrapper component for programme builder integration
+- **Firestore Collections** - `programmeSubjects` collection for course programme data, `programmeTemplates` collection for reusable templates

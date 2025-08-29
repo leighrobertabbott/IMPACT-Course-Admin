@@ -44,12 +44,13 @@ import {
   Heart
 } from 'lucide-react';
 import EmailTemplateManager from '../components/EmailTemplateManager';
-import ProgrammeBuilderModal from '../components/ProgrammeBuilderModal';
+import ProgrammeBuilderWrapper from '../components/ProgrammeBuilderWrapper';
 import FacultyManagementModal from '../components/FacultyManagementModal';
 import MentorAssignmentModal from '../components/MentorAssignmentModal';
 import ProspectusGenerator from '../components/ProspectusGenerator';
 import ProgrammeGenerator from '../components/ProgrammeGenerator';
 import LocationManagementModal from '../components/LocationManagementModal';
+import { useProgrammeBuilder } from '../hooks/useProgrammeBuilder';
 
 const AdminPanel = () => {
   // Core state
@@ -139,35 +140,28 @@ const AdminPanel = () => {
     variables: []
   });
   
-  // Programme management
-  const [programmeSubjects, setProgrammeSubjects] = useState([]);
-  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
-  const [subjectForm, setSubjectForm] = useState({
-    name: '',
-    type: 'session', // session, workshop, practical, assessment, break, lunch, assessment, practical-session
-    duration: 30,
-    description: '',
-    day: 1,
-    startTime: '09:00',
-    endTime: '09:30',
-    // Workshop rotation fields
-    isWorkshopRotation: false,
-    numberOfWorkshops: 4,
-    workshopDuration: 40,
-    numberOfRotations: 4,
-    selectedWorkshopSubjects: [], // Array to store selected predefined workshop subjects
-    // Scenario practice and practical session fields
-    numberOfStations: 4,
-    numberOfTimeSlots: 4,
-    timeSlotDuration: 30,
-    stationNames: [],
-    // Concurrent activity fields for scenario practice
-    concurrentActivityName: '',
-    scenarioCandidatesFirst: '',
-    concurrentCandidatesFirst: '',
-    scenarioCandidatesSecond: '',
-    concurrentCandidatesSecond: ''
-  });
+  // Hook integration - keeping existing code for now
+  const {
+    programmeSubjects: hookProgrammeSubjects,
+    showAddSubjectModal: hookShowAddSubjectModal,
+    setShowAddSubjectModal: hookSetShowAddSubjectModal,
+    subjectForm: hookSubjectForm,
+    setSubjectForm: hookSetSubjectForm,
+    predefinedWorkshopSubjects: hookPredefinedWorkshopSubjects,
+    fetchProgrammeSubjects: hookFetchProgrammeSubjects,
+    addProgrammeSubject: hookAddProgrammeSubject,
+    deleteProgrammeSubject: hookDeleteProgrammeSubject,
+    editProgrammeSubject: hookEditProgrammeSubject,
+    updateProgrammeSubject: hookUpdateProgrammeSubject,
+    getWorkshopGroups: hookGetWorkshopGroups
+  } = useProgrammeBuilder(selectedCourse);
+  
+  // Programme management - using hook values
+  const programmeSubjects = hookProgrammeSubjects;
+  const showAddSubjectModal = hookShowAddSubjectModal;
+  const setShowAddSubjectModal = hookSetShowAddSubjectModal;
+  const subjectForm = hookSubjectForm;
+  const setSubjectForm = hookSetSubjectForm;
 
   const [showEditSubjectModal, setShowEditSubjectModal] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
@@ -207,50 +201,18 @@ const AdminPanel = () => {
     }
   }, [selectedCourse]);
 
-  // Predefined workshop subjects for consistent tracking
-  const predefinedWorkshopSubjects = [
-    'Fluids and Transfusion',
-    'Lumbar Puncture and CSF Analysis',
-    'Advanced Arrhythmia Management',
-    'Imaging and Radiology',
-    'Emergency Procedures',
-    'Clinical Decision Making',
-    'Ventilation and Oxygenation',
-    'Shock Management',
-    'Cardiac Assessment',
-    'Neurological Assessment'
-  ];
 
-  // Predefined practical subjects for practical sessions
-  const predefinedPracticalSubjects = [
-    'Central Venous Cannulation',
-    'Thoracocentesis',
-    'Lumbar Puncture',
-    'Arterial Line Insertion',
-    'Chest Drain Insertion',
-    'Endotracheal Intubation',
-    'Supraglottic Airway Insertion',
-    'Needle Cricothyroidotomy',
-    'Pleural Aspiration',
-    'Abdominal Paracentesis',
-    'Joint Aspiration',
-    'Pericardiocentesis',
-    'Nasogastric Tube Insertion',
-    'Urinary Catheterisation',
-    'Peripheral IV Cannulation',
-    'Blood Gas Sampling'
-  ];
 
   // Update selected workshop subjects when number of workshops changes
   useEffect(() => {
     if (subjectForm.isWorkshopRotation) {
       const currentSelected = subjectForm.selectedWorkshopSubjects;
       const newSelected = Array(subjectForm.numberOfWorkshops).fill('').map((_, index) => 
-        currentSelected[index] || predefinedWorkshopSubjects[index] || `Workshop ${index + 1}`
+        currentSelected[index] || hookPredefinedWorkshopSubjects[index] || `Workshop ${index + 1}`
       );
       setSubjectForm(prev => ({ ...prev, selectedWorkshopSubjects: newSelected }));
     }
-  }, [subjectForm.numberOfWorkshops, subjectForm.isWorkshopRotation]);
+  }, [subjectForm.numberOfWorkshops, subjectForm.isWorkshopRotation, hookPredefinedWorkshopSubjects]);
 
   // Generate rotation schedule for preview
   const generateRotationSchedule = () => {
@@ -301,20 +263,8 @@ const AdminPanel = () => {
     return schedule;
   };
 
-  // Calculate which groups should attend a specific workshop session
-  const getWorkshopGroups = (subject) => {
-    if (!subject.isWorkshopRotation || !subject.rotationSequence || !subject.workshopIndex) {
-      return null;
-    }
-
-    const groups = ['A', 'B', 'C', 'D'];
-    const rotation = subject.rotationSequence - 1; // Convert to 0-based index
-    const workshopIndex = subject.workshopIndex - 1; // Convert to 0-based index
-    
-    // Calculate which group attends this workshop in this rotation
-    const groupIndex = (workshopIndex + rotation) % groups.length;
-    return groups[groupIndex];
-  };
+  // Function to get workshop groups for display - using hook function
+  const getWorkshopGroups = hookGetWorkshopGroups;
 
   const fetchAllCourses = async () => {
     try {
@@ -415,20 +365,7 @@ const AdminPanel = () => {
     }
   };
 
-  const fetchProgrammeSubjects = async () => {
-    try {
-      if (!selectedCourse) return;
-      
-      const subjectsSnapshot = await getDocs(collection(db, 'programmeSubjects'));
-      const subjectsData = subjectsSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(subject => subject.courseId === selectedCourse.id && !subject.deleted);
-      
-      setProgrammeSubjects(subjectsData);
-    } catch (error) {
-      console.error('Error fetching programme subjects:', error);
-    }
-  };
+  const fetchProgrammeSubjects = hookFetchProgrammeSubjects;
 
   const fetchEmailTemplates = async () => {
     try {
@@ -576,342 +513,11 @@ const AdminPanel = () => {
     }
   };
 
-  // Programme Management Functions
-  const addProgrammeSubject = async () => {
-    try {
-      if (!selectedCourse) {
-        toast.error('No course selected');
-        return;
-      }
-
-      if (!subjectForm.name || !subjectForm.type) {
-        toast.error('Please fill in all required fields');
-        return;
-      }
-
-      // Handle workshop rotation
-      if (subjectForm.type === 'workshop' && subjectForm.isWorkshopRotation) {
-        if (subjectForm.selectedWorkshopSubjects.filter(s => s.trim() !== '').length !== subjectForm.numberOfWorkshops) {
-          toast.error('Please select all workshop subjects');
-          return;
-        }
-
-        // Get all existing workshop rotation subjects for this course
-        const existingWorkshopSubjects = programmeSubjects.filter(s => s.isWorkshopRotation && s.courseId === selectedCourse.id);
-        
-        // Track which groups have completed which workshops
-        const groupProgress = {
-          'A': new Set(),
-          'B': new Set(),
-          'C': new Set(),
-          'D': new Set()
-        };
-
-        // Build group progress from existing workshop subjects
-        existingWorkshopSubjects.forEach(subject => {
-          if (subject.rotationSchedule) {
-            subject.rotationSchedule.forEach(schedule => {
-              // Handle both individual groups and combined groups
-              if (schedule.groups) {
-                // New format with groups array
-                schedule.groups.forEach(group => {
-                  groupProgress[group].add(subject.name);
-                });
-              } else {
-                // Legacy format - check if it's a combined group
-                if (schedule.group.includes('+')) {
-                  // Combined group format (e.g., "A+B")
-                  schedule.group.split('+').forEach(group => {
-                    groupProgress[group].add(subject.name);
-                  });
-                } else {
-                  // Single group
-                  groupProgress[schedule.group].add(subject.name);
-                }
-              }
-            });
-          }
-        });
-
-        // Allow the same workshop names to be added multiple times for different time slots
-        // Instead of checking for existing names, we'll create new workshop subjects for all selected workshops
-        const newWorkshopNames = subjectForm.selectedWorkshopSubjects.filter(name => name.trim() !== '');
-        
-        if (newWorkshopNames.length === 0) {
-          toast.error('Please select at least one workshop subject');
-          return;
-        }
-
-        // Create workshop subjects (one for each new workshop type)
-        const groups = ['A', 'B', 'C', 'D'];
-        let rotationSequence = 1;
-
-        // Find the highest rotation sequence in existing subjects
-        if (existingWorkshopSubjects.length > 0) {
-          const maxRotation = Math.max(...existingWorkshopSubjects.map(s => s.rotationSequence || 0));
-          rotationSequence = maxRotation + 1;
-        }
-
-        // Create one subject for each new workshop type
-        for (let workshopIndex = 0; workshopIndex < newWorkshopNames.length; workshopIndex++) {
-          const workshopName = newWorkshopNames[workshopIndex];
-          
-          // Find groups that haven't done this workshop yet
-          const availableGroups = groups.filter(group => !groupProgress[group].has(workshopName));
-          
-          if (availableGroups.length === 0) {
-            toast.error(`All groups have already completed workshop: ${workshopName}`);
-            continue;
-          }
-
-          // Create rotation schedule for this workshop
-          const rotationSchedule = [];
-          
-          // If we have fewer workshops than groups, combine groups
-          const shouldCombineGroups = newWorkshopNames.length < groups.length;
-          
-          if (shouldCombineGroups) {
-            // Calculate how many groups should be combined
-            const groupsPerWorkshop = Math.ceil(groups.length / newWorkshopNames.length);
-            
-            for (let rotationIndex = 0; rotationIndex < subjectForm.numberOfRotations; rotationIndex++) {
-              const startGroupIndex = (rotationIndex * groupsPerWorkshop) % availableGroups.length;
-              const endGroupIndex = Math.min(startGroupIndex + groupsPerWorkshop, availableGroups.length);
-              const combinedGroups = availableGroups.slice(startGroupIndex, endGroupIndex);
-              
-              rotationSchedule.push({
-                rotation: rotationIndex + 1,
-                group: combinedGroups.join('+'), // Combine groups with '+'
-                groups: combinedGroups, // Store individual groups for reference
-                timeSlot: `${subjectForm.startTime} + ${rotationIndex * subjectForm.workshopDuration} minutes`
-              });
-            }
-          } else {
-            // Standard rotation - one group per rotation
-            for (let rotationIndex = 0; rotationIndex < subjectForm.numberOfRotations; rotationIndex++) {
-              const groupIndex = rotationIndex % availableGroups.length;
-              const group = availableGroups[groupIndex];
-              
-              rotationSchedule.push({
-                rotation: rotationIndex + 1,
-                group: group,
-                groups: [group], // Store as array for consistency
-                timeSlot: `${subjectForm.startTime} + ${rotationIndex * subjectForm.workshopDuration} minutes`
-              });
-            }
-          }
-
-          const workshopData = {
-            name: workshopName,
-            type: 'workshop',
-            duration: subjectForm.workshopDuration,
-            description: `Workshop: ${workshopName} - Groups rotate through this workshop`,
-            day: subjectForm.day,
-            startTime: subjectForm.startTime,
-            endTime: subjectForm.endTime,
-            courseId: selectedCourse.id,
-            courseName: selectedCourse.name,
-            createdAt: new Date(),
-            assignedFaculty: [],
-            assignedMaterials: [],
-            isWorkshopRotation: true,
-            rotationSequence: rotationSequence,
-            workshopIndex: existingWorkshopSubjects.length + workshopIndex + 1,
-            totalWorkshops: existingWorkshopSubjects.length + newWorkshopNames.length,
-            totalRotations: subjectForm.numberOfRotations,
-            rotationSchedule: rotationSchedule,
-            // Track which groups have completed this workshop
-            completedGroups: rotationSchedule.map(schedule => schedule.groups || [schedule.group]).flat()
-          };
-
-          await addDoc(collection(db, 'programmeSubjects'), workshopData);
-        }
-
-        toast.success(`${newWorkshopNames.length} new workshop subjects created with group rotation schedule`);
-      } else if (subjectForm.type === 'assessment') {
-        // Handle assessment sessions
-        const subjectData = {
-          name: subjectForm.name,
-          type: 'assessment',
-          duration: subjectForm.duration,
-          description: subjectForm.description,
-          day: subjectForm.day,
-          startTime: subjectForm.startTime,
-          endTime: subjectForm.endTime,
-          courseId: selectedCourse.id,
-          courseName: selectedCourse.name,
-          createdAt: new Date(),
-          assignedFaculty: [],
-          assignedMaterials: [],
-          isAssessment: true,
-          // Assessment specific fields
-          numberOfStations: subjectForm.numberOfStations,
-          numberOfTimeSlots: subjectForm.numberOfTimeSlots,
-          timeSlotDuration: subjectForm.timeSlotDuration,
-          // Concurrent activity information
-          concurrentActivityName: subjectForm.concurrentActivityName || null,
-          scenarioCandidatesFirst: subjectForm.scenarioCandidatesFirst || null,
-          concurrentCandidatesFirst: subjectForm.concurrentCandidatesFirst || null,
-          scenarioCandidatesSecond: subjectForm.scenarioCandidatesSecond || null,
-          concurrentCandidatesSecond: subjectForm.concurrentCandidatesSecond || null
-        };
-
-        await addDoc(collection(db, 'programmeSubjects'), subjectData);
-        toast.success('Assessment session added to programme successfully');
-      } else if (subjectForm.type === 'practical-session') {
-        // Handle practical sessions
-        const subjectData = {
-          name: subjectForm.name,
-          type: 'practical-session',
-          duration: subjectForm.duration,
-          description: subjectForm.description,
-          day: subjectForm.day,
-          startTime: subjectForm.startTime,
-          endTime: subjectForm.endTime,
-          courseId: selectedCourse.id,
-          courseName: selectedCourse.name,
-          createdAt: new Date(),
-          assignedFaculty: [],
-          assignedMaterials: [],
-          // Practical session specific fields
-          numberOfStations: subjectForm.numberOfStations,
-          numberOfTimeSlots: subjectForm.numberOfTimeSlots,
-          timeSlotDuration: subjectForm.timeSlotDuration,
-          stationNames: subjectForm.stationNames
-        };
-
-        await addDoc(collection(db, 'programmeSubjects'), subjectData);
-        toast.success('Practical session added to programme successfully');
-
-      } else if (subjectForm.type === 'scenario-practice') {
-        // Handle scenario practice session
-        const scenarioPracticeData = {
-          name: subjectForm.name,
-          type: 'scenario-practice',
-          duration: subjectForm.timeSlotDuration * subjectForm.numberOfTimeSlots,
-          description: `Scenario Practice: ${subjectForm.numberOfStations} stations, ${subjectForm.numberOfTimeSlots} time slots`,
-          day: subjectForm.day,
-          startTime: subjectForm.startTime,
-          endTime: subjectForm.endTime,
-          courseId: selectedCourse.id,
-          courseName: selectedCourse.name,
-          createdAt: new Date(),
-          assignedFaculty: [],
-          assignedMaterials: [],
-          isScenarioPractice: true,
-          numberOfStations: subjectForm.numberOfStations,
-          numberOfTimeSlots: subjectForm.numberOfTimeSlots,
-          timeSlotDuration: subjectForm.timeSlotDuration,
-
-          stationRooms: subjectForm.stationRooms || []
-        };
-
-        await addDoc(collection(db, 'programmeSubjects'), scenarioPracticeData);
-        toast.success('Scenario Practice session added to programme successfully');
-      } else {
-        // Regular subject
-        const subjectData = {
-          ...subjectForm,
-          courseId: selectedCourse.id,
-          courseName: selectedCourse.name,
-          createdAt: new Date(),
-          assignedFaculty: [],
-          assignedMaterials: []
-        };
-
-        await addDoc(collection(db, 'programmeSubjects'), subjectData);
-        toast.success('Subject added to programme successfully');
-      }
-
-      setShowAddSubjectModal(false);
-      setSubjectForm({
-        name: '',
-        type: 'session', // session, workshop, practical, assessment, break, lunch, assessment, practical-session
-        duration: 30,
-        description: '',
-        day: 1,
-        startTime: '09:00',
-        endTime: '09:30',
-        // Workshop rotation fields
-        isWorkshopRotation: false,
-        numberOfWorkshops: 4,
-        workshopDuration: 40,
-        numberOfRotations: 4,
-        selectedWorkshopSubjects: [],
-        // Scenario practice and practical session fields
-        numberOfStations: 4,
-        numberOfTimeSlots: 4,
-        timeSlotDuration: 30,
-        stationNames: [],
-        // Concurrent activity fields for scenario practice
-        concurrentActivityName: '',
-        scenarioCandidatesFirst: '',
-        concurrentCandidatesFirst: '',
-        scenarioCandidatesSecond: '',
-        concurrentCandidatesSecond: ''
-      });
-      fetchProgrammeSubjects();
-    } catch (error) {
-      console.error('Error adding programme subject:', error);
-      toast.error('Failed to add subject to programme');
-    }
-  };
-
-  const deleteProgrammeSubject = async (subjectId) => {
-    const confirmed = window.confirm(
-      'This will remove the subject from the programme. This change will be reflected in both Course Management and Admin Panel. Continue?'
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-      const subjectRef = doc(db, 'programmeSubjects', subjectId);
-      await updateDoc(subjectRef, { 
-        deleted: true,
-        deletedAt: new Date()
-      });
-      toast.success('Subject removed from programme');
-      fetchProgrammeSubjects();
-    } catch (error) {
-      console.error('Error deleting programme subject:', error);
-      toast.error('Failed to remove subject from programme');
-    }
-  };
-
-  const editProgrammeSubject = async (subject) => {
-    setEditingSubject(subject);
-    setEditForm({
-      name: subject.name,
-      description: subject.description
-    });
-    setShowEditSubjectModal(true);
-  };
-
-  const updateProgrammeSubject = async () => {
-    if (!editingSubject || !editForm.name.trim()) {
-      toast.error('Please provide a subject name');
-      return;
-    }
-
-    try {
-      // Only allow safe fields to be updated
-      const safeUpdates = {
-        name: editForm.name.trim(),
-        description: editForm.description.trim()
-      };
-
-      await updateDoc(doc(db, 'programmeSubjects', editingSubject.id), safeUpdates);
-      
-      toast.success('Subject updated successfully');
-      setShowEditSubjectModal(false);
-      setEditingSubject(null);
-      setEditForm({ name: '', description: '' });
-      fetchProgrammeSubjects();
-    } catch (error) {
-      console.error('Error updating subject:', error);
-      toast.error('Failed to update subject');
-    }
-  };
+  // Programme Building Functions - using hook functions
+  const addProgrammeSubject = hookAddProgrammeSubject;
+  const deleteProgrammeSubject = hookDeleteProgrammeSubject;
+  const editProgrammeSubject = hookEditProgrammeSubject;
+  const updateProgrammeSubject = hookUpdateProgrammeSubject;
 
   // Manual cleanup function for admin use
   const performCleanup = async () => {
@@ -3684,14 +3290,13 @@ IMPACT @ Whiston Hospital`,
       )}
 
       {/* Programme Subject Modal */}
-      <ProgrammeBuilderModal
+      <ProgrammeBuilderWrapper
+        courseId={selectedCourse}
         isOpen={showAddSubjectModal}
         onClose={() => setShowAddSubjectModal(false)}
         subjectForm={subjectForm}
         setSubjectForm={setSubjectForm}
         onAddSubject={addProgrammeSubject}
-        predefinedWorkshopSubjects={predefinedWorkshopSubjects}
-        predefinedPracticalSubjects={predefinedPracticalSubjects}
       />
 
       {/* Assign Faculty Modal */}

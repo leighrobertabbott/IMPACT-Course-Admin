@@ -43,7 +43,7 @@ import {
   CreditCard,
   Building2
 } from 'lucide-react';
-import ProgrammeBuilderModal from '../components/ProgrammeBuilderModal';
+import ProgrammeBuilderWrapper from '../components/ProgrammeBuilderWrapper';
 import FacultyManagementModal from '../components/FacultyManagementModal';
 import ProspectusGenerator from '../components/ProspectusGenerator';
 import ProgrammeGenerator from '../components/ProgrammeGenerator';
@@ -77,20 +77,13 @@ const CourseManagement = () => {
   const [courseMaterials, setCourseMaterials] = useState([]);
   const [locations, setLocations] = useState([]);
 
-  // Predefined workshop subjects for rotation - using hook values
-  const predefinedWorkshopSubjects = hookPredefinedWorkshopSubjects;
+  // New state for course management - MOVED HERE to fix temporal dead zone
+  const [showNewCourseModal, setShowNewCourseModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showCourseSettingsModal, setShowCourseSettingsModal] = useState(false);
+  const [allCourses, setAllCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState(null);
 
-  // Predefined practical subjects for practical sessions - using hook values
-  const predefinedPracticalSubjects = hookPredefinedPracticalSubjects;
-
-  // Function to get workshop groups for display - using hook function
-  const getWorkshopGroups = hookGetWorkshopGroups;
-
-  // New state for programme building - using hook values
-  const programmeSubjects = hookProgrammeSubjects;
-  const showAddSubjectModal = hookShowAddSubjectModal;
-  const setShowAddSubjectModal = hookSetShowAddSubjectModal;
-  
   // Hook integration - keeping existing code for now
   const {
     programmeSubjects: hookProgrammeSubjects,
@@ -98,8 +91,6 @@ const CourseManagement = () => {
     setShowAddSubjectModal: hookSetShowAddSubjectModal,
     subjectForm: hookSubjectForm,
     setSubjectForm: hookSetSubjectForm,
-    predefinedWorkshopSubjects: hookPredefinedWorkshopSubjects,
-    predefinedPracticalSubjects: hookPredefinedPracticalSubjects,
     fetchProgrammeSubjects: hookFetchProgrammeSubjects,
     addProgrammeSubject: hookAddProgrammeSubject,
     deleteProgrammeSubject: hookDeleteProgrammeSubject,
@@ -107,23 +98,28 @@ const CourseManagement = () => {
     updateProgrammeSubject: hookUpdateProgrammeSubject,
     getWorkshopGroups: hookGetWorkshopGroups
   } = useProgrammeBuilder(selectedCourse);
+
+
+
+  // Function to get workshop groups for display - using hook function (MOVED HERE)
+  const getWorkshopGroups = hookGetWorkshopGroups;
+
+  // New state for programme building - using hook values (MOVED HERE)
+  const programmeSubjects = hookProgrammeSubjects;
+  const showAddSubjectModal = hookShowAddSubjectModal;
+  const setShowAddSubjectModal = hookSetShowAddSubjectModal;
   const [showAssignFacultyModal, setShowAssignFacultyModal] = useState(false);
   const [showAssignMaterialsModal, setShowAssignMaterialsModal] = useState(false);
   const [showAssignStationFacultyModal, setShowAssignStationFacultyModal] = useState(false);
   const [showAssignConcurrentFacultyModal, setShowAssignConcurrentFacultyModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedStationIndex, setSelectedStationIndex] = useState(null);
-  const subjectForm = hookSubjectForm;
-  const setSubjectForm = hookSetSubjectForm;
+  const subjectForm = hookSubjectForm; // MOVED HERE
+  const setSubjectForm = hookSetSubjectForm; // MOVED HERE
 
 
 
-  // New state for course management
-  const [showNewCourseModal, setShowNewCourseModal] = useState(false);
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [showCourseSettingsModal, setShowCourseSettingsModal] = useState(false);
-  const [allCourses, setAllCourses] = useState([]);
-  const [selectedCourse, setSelectedCourse] = useState(null);
+  // New state for course management - REMOVED (moved above)
   const [newCourseForm, setNewCourseForm] = useState({
     name: '',
     startDate: '',
@@ -2631,14 +2627,13 @@ const CourseManagement = () => {
        )}
 
        {/* Add Subject Modal */}
-       <ProgrammeBuilderModal
+       <ProgrammeBuilderWrapper
+         courseId={selectedCourse}
          isOpen={showAddSubjectModal}
          onClose={() => setShowAddSubjectModal(false)}
          subjectForm={subjectForm}
          setSubjectForm={setSubjectForm}
          onAddSubject={addProgrammeSubject}
-         predefinedWorkshopSubjects={predefinedWorkshopSubjects}
-         predefinedPracticalSubjects={predefinedPracticalSubjects}
        />
 
 

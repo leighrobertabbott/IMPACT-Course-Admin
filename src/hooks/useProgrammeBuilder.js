@@ -36,16 +36,30 @@ export const useProgrammeBuilder = (selectedCourse) => {
 
   // Predefined workshop subjects for rotation
   const predefinedWorkshopSubjects = [
+    'Fluids and Transfusion',
+    'Lumbar Puncture and CSF Analysis',
+    'Advanced Arrhythmia Management',
+    'Imaging and Radiology'
+  ];
+
+  // Predefined session subjects for regular sessions
+  const predefinedSessionSubjects = [
+    'Registration / Meeting for Faculty',
+    'Welcome and Introductions – Why IMPACT?',
+    'Faculty Demonstration followed by Initial Assessment',
     'Triage and Resource Management',
-    'Airway Management',
-    'Cardiac Arrest Management',
-    'Trauma Assessment',
-    'Medical Emergencies',
-    'Paediatric Emergencies',
-    'Obstetric Emergencies',
-    'Mental Health Crisis',
-    'Communication Skills',
-    'Team Leadership'
+    'The Breathless Patient',
+    'Shock',
+    'Respiratory Support',
+    'Chest Pain',
+    'Acute Kidney Injury',
+    'Neurological Emergencies',
+    'Gastrointestinal Emergencies',
+    'Sugar & Salt',
+    'Retests / Mentor Feedback',
+    'Summary and Close',
+    'Break',
+    'Lunch'
   ];
 
   // Predefined practical subjects for practical sessions
@@ -451,6 +465,7 @@ export const useProgrammeBuilder = (selectedCourse) => {
     subjectForm,
     setSubjectForm,
     predefinedWorkshopSubjects,
+    predefinedSessionSubjects,
     predefinedPracticalSubjects,
 
     // Functions

@@ -21,8 +21,20 @@ A comprehensive web application for managing the IMPACT (Ill Medical Patients' A
 - Create and manage multiple course sessions with full lifecycle management
 - Set course dates, venues, and capacity limits with real-time tracking
 - Archive and reactivate courses with complete data preservation
-- Advanced programme builder with drag-and-drop functionality
-- Template-based programme creation for consistency
+- **Advanced programme builder** with drag-and-drop functionality and predefined subjects
+- **Template-based programme creation** for consistency across courses
+- **Predefined subject system** with standardized workshop, session, and practical subjects
+
+### **📋 Programme Builder System** *(ENHANCED)*
+- **Centralized programme management** via `useProgrammeBuilder` hook
+- **Predefined subject lists** for sessions and practical activities
+- **Dynamic subject selection** with dropdown menus for sessions/practicals, free-text for workshops/assessments/practical-sessions
+- **Fixed subject names** for scenario-practice, break, and lunch (auto-filled and disabled)
+- **Workshop naming system** with free-text names for generic workshop blocks
+- **Workshop rotation management** with automatic group assignments and specific subject selection
+- **Faculty assignment integration** for subject-level teaching assignments
+- **Template system** for reusable programme structures
+- **Real-time programme updates** across all course views
 
 ### **👥 Candidate Management**
 - Comprehensive candidate application tracking with status progression

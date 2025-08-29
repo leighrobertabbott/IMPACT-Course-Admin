@@ -8,16 +8,28 @@ const ProgrammeBuilderModal = ({
   setSubjectForm,
   onAddSubject,
   predefinedWorkshopSubjects = [
+    'Fluids and Transfusion',
+    'Lumbar Puncture and CSF Analysis',
+    'Advanced Arrhythmia Management',
+    'Imaging and Radiology'
+  ],
+  predefinedSessionSubjects = [
+    'Registration / Meeting for Faculty',
+    'Welcome and Introductions – Why IMPACT?',
+    'Faculty Demonstration followed by Initial Assessment',
     'Triage and Resource Management',
-    'Airway Management',
-    'Cardiac Arrest Management',
-    'Trauma Assessment',
-    'Medical Emergencies',
-    'Paediatric Emergencies',
-    'Obstetric Emergencies',
-    'Mental Health Crisis',
-    'Communication Skills',
-    'Team Leadership'
+    'The Breathless Patient',
+    'Shock',
+    'Respiratory Support',
+    'Chest Pain',
+    'Acute Kidney Injury',
+    'Neurological Emergencies',
+    'Gastrointestinal Emergencies',
+    'Sugar & Salt',
+    'Retests / Mentor Feedback',
+    'Summary and Close',
+    'Break',
+    'Lunch'
   ],
   predefinedPracticalSubjects = [
     'Central Venous Cannulation',
@@ -110,13 +122,58 @@ const ProgrammeBuilderModal = ({
             <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
               Subject Name *
             </label>
-            <input
-              type="text"
-              value={subjectForm.name}
-              onChange={(e) => setSubjectForm(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="e.g., Triage and Resource Management"
-            />
+            {subjectForm.type === 'workshop' ? (
+              <input
+                type="text"
+                value={subjectForm.name}
+                onChange={(e) => setSubjectForm(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                placeholder="Enter workshop name (e.g., Clinical Skills Workshop)"
+              />
+            ) : subjectForm.type === 'scenario-practice' ? (
+              <input
+                type="text"
+                value={subjectForm.name}
+                disabled
+                className="w-full p-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+              />
+            ) : subjectForm.type === 'break' ? (
+              <input
+                type="text"
+                value={subjectForm.name}
+                disabled
+                className="w-full p-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+              />
+            ) : subjectForm.type === 'lunch' ? (
+              <input
+                type="text"
+                value={subjectForm.name}
+                disabled
+                className="w-full p-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+              />
+            ) : subjectForm.type === 'assessment' || subjectForm.type === 'practical-session' ? (
+              <input
+                type="text"
+                value={subjectForm.name}
+                onChange={(e) => setSubjectForm(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                placeholder={`Enter ${subjectForm.type.replace('-', ' ')} name...`}
+              />
+            ) : (
+              <select
+                value={subjectForm.name}
+                onChange={(e) => setSubjectForm(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Select a subject...</option>
+                {subjectForm.type === 'session' && predefinedSessionSubjects.map((subject, index) => (
+                  <option key={index} value={subject}>{subject}</option>
+                ))}
+                {subjectForm.type === 'practical' && predefinedPracticalSubjects.map((subject, index) => (
+                  <option key={index} value={subject}>{subject}</option>
+                ))}
+              </select>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-nhs-dark-grey mb-2">
@@ -124,7 +181,27 @@ const ProgrammeBuilderModal = ({
             </label>
             <select
               value={subjectForm.type}
-              onChange={(e) => setSubjectForm(prev => ({ ...prev, type: e.target.value }))}
+              onChange={(e) => {
+                const newType = e.target.value;
+                let newName = subjectForm.name;
+                
+                // Auto-set name for fixed-text subject types
+                if (newType === 'scenario-practice') {
+                  newName = 'Scenario Practice';
+                } else if (newType === 'break') {
+                  newName = 'Break';
+                } else if (newType === 'lunch') {
+                  newName = 'Lunch';
+                } else if (newType === 'workshop') {
+                  newName = ''; // Clear for workshop as it's free text
+                } else if (newType === 'assessment' || newType === 'practical-session') {
+                  newName = ''; // Clear for free text types
+                } else {
+                  newName = ''; // Clear for dropdown types
+                }
+                
+                setSubjectForm(prev => ({ ...prev, type: newType, name: newName }));
+              }}
               className="w-full p-2 border border-gray-300 rounded-md"
             >
               <option value="session">Session</option>
