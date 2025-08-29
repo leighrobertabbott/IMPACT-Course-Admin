@@ -137,21 +137,24 @@ export const useProgrammeBuilder = (selectedCourse) => {
       return null;
     }
 
-    const groups = ['A', 'B', 'C', 'D'];
-    const allGroups = new Set();
-
-    // Collect all groups that attend this practical session across all time slots
+    // Return a detailed breakdown of station assignments
+    const stationAssignments = [];
+    
     subject.rotationSchedule.forEach(timeSlot => {
       timeSlot.sessions.forEach(session => {
-        if (session.groups) {
-          session.groups.forEach(group => {
-            allGroups.add(group);
-          });
+        if (session.station && session.groups) {
+          const groupsText = Array.isArray(session.groups) ? session.groups.join('+') : session.groups;
+          stationAssignments.push(`${session.station}: ${groupsText}`);
         }
       });
     });
 
-    return Array.from(allGroups).sort().join(', ');
+    // Return the first time slot assignments as the main display
+    if (stationAssignments.length > 0) {
+      return stationAssignments.slice(0, subject.numberOfStations || 2).join(' | ');
+    }
+
+    return null;
   };
 
   // Fetch programme subjects

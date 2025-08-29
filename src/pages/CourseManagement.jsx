@@ -1828,40 +1828,77 @@ const CourseManagement = () => {
                        </button>
                      </div>
 
-                     {/* Faculty Assignment - Only show for non-break/lunch items */}
-                     {subject.type !== 'break' && subject.type !== 'lunch' && (
-                       <div className="mb-3">
-                         <div className="flex justify-between items-center mb-2">
-                           <h5 className="font-medium text-nhs-dark-grey">Assigned Faculty</h5>
-                           <button
-                             onClick={() => {
-                               setSelectedSubject(subject);
-                               setShowAssignFacultyModal(true);
-                             }}
-                             className="text-nhs-blue hover:text-nhs-dark-blue text-sm"
-                           >
-                             Assign Faculty
-                           </button>
-                         </div>
-                         <div className="flex flex-wrap gap-2">
-                           {subject.assignedFaculty && subject.assignedFaculty.length > 0 ? (
-                             subject.assignedFaculty.map((facultyMember) => (
-                               <div key={facultyMember.id} className="flex items-center space-x-2 bg-gray-100 px-2 py-1 rounded text-sm">
-                                 <span>{facultyMember.name}</span>
-                                 <button
-                                   onClick={() => removeFacultyFromSubject(subject.id, facultyMember.id)}
-                                   className="text-red-500 hover:text-red-700"
-                                 >
-                                   <X size={12} />
-                                 </button>
+                                                {/* Faculty Assignment - Only show for non-break/lunch items */}
+                           {subject.type !== 'break' && subject.type !== 'lunch' && (
+                             <div className="mb-3">
+                               <div className="flex justify-between items-center mb-2">
+                                 <h5 className="font-medium text-nhs-dark-grey">Assigned Faculty</h5>
+                                 <div className="flex space-x-2">
+                                   <button
+                                     onClick={() => {
+                                       setSelectedSubject(subject);
+                                       setShowAssignFacultyModal(true);
+                                     }}
+                                     className="text-nhs-blue hover:text-nhs-dark-blue text-sm"
+                                   >
+                                     Assign Faculty
+                                   </button>
+                                   {/* Show station faculty assignment button for practical sessions */}
+                                   {subject.isPracticalSession && (
+                                     <button
+                                       onClick={() => {
+                                         setSelectedSubject(subject);
+                                         setShowAssignStationFacultyModal(true);
+                                       }}
+                                       className="text-indigo-600 hover:text-indigo-800 text-sm"
+                                     >
+                                       Assign Station Faculty
+                                     </button>
+                                   )}
+                                 </div>
                                </div>
-                             ))
-                           ) : (
-                             <span className="text-sm text-nhs-grey">No faculty assigned</span>
+                               <div className="flex flex-wrap gap-2">
+                                 {subject.assignedFaculty && subject.assignedFaculty.length > 0 ? (
+                                   subject.assignedFaculty.map((facultyMember) => (
+                                     <div key={facultyMember.id} className="flex items-center space-x-2 bg-gray-100 px-2 py-1 rounded text-sm">
+                                       <span>{facultyMember.name}</span>
+                                       <button
+                                         onClick={() => removeFacultyFromSubject(subject.id, facultyMember.id)}
+                                         className="text-red-500 hover:text-red-700"
+                                       >
+                                         <X size={12} />
+                                       </button>
+                                     </div>
+                                   ))
+                                 ) : (
+                                   <span className="text-sm text-nhs-grey">No faculty assigned</span>
+                                 )}
+                               </div>
+                               
+                               {/* Show station faculty assignments for practical sessions */}
+                               {subject.isPracticalSession && subject.stationFaculty && (
+                                 <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                                   <h6 className="font-medium text-nhs-dark-grey mb-2">Station Faculty Assignments:</h6>
+                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                     {subject.stationFaculty.map((stationFaculty, stationIndex) => (
+                                       <div key={stationIndex} className="bg-white p-2 rounded border">
+                                         <div className="font-medium text-nhs-dark-grey">
+                                           Station {stationIndex + 1}: {subject.stationNames?.[stationIndex] || `Station ${stationIndex + 1}`}
+                                         </div>
+                                         <div className="text-nhs-grey">
+                                           {stationFaculty.length > 0 ? (
+                                             stationFaculty.map(faculty => faculty.name).join(', ')
+                                           ) : (
+                                             'No faculty assigned'
+                                           )}
+                                         </div>
+                                       </div>
+                                     ))}
+                                   </div>
+                                 </div>
+                               )}
+                             </div>
                            )}
-                         </div>
-                       </div>
-                     )}
 
                      {/* Materials Assignment - Only show for non-break/lunch items */}
                      {subject.type !== 'break' && subject.type !== 'lunch' && (
