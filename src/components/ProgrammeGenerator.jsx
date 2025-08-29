@@ -59,11 +59,11 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
         toast.error('No programme data found. Please add programme subjects in Course Management first.');
       }
       
-      // Sort by day and time
-      programmeData.sort((a, b) => {
-        if (a.day !== b.day) return a.day - b.day;
-        return a.startTime.localeCompare(b.startTime);
-      });
+             // Sort by day and time, with workshop rotations expanded for proper chronological ordering
+       programmeData.sort((a, b) => {
+         if (a.day !== b.day) return a.day - b.day;
+         return a.startTime.localeCompare(b.startTime);
+       });
       setProgramme(programmeData);
     } catch (error) {
       console.error('Error fetching programme:', error);
@@ -184,8 +184,8 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
 
     // Get day-specific programme items
     const getDayProgramme = (day) => {
-      // Exclude workshop rotations from main schedule - they go in separate section
-      return programme.filter(item => item.day === day && !item.isWorkshopRotation);
+      // Include ALL programme items for the day in chronological order
+      return programme.filter(item => item.day === day);
     };
 
     const getWorkshopRotations = (day) => {
@@ -230,36 +230,42 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
       }
     };
 
-    // Generate workshop rotation schedule with actual times
-    const generateWorkshopSchedule = (workshops) => {
-      if (!workshops || workshops.length === 0) return '';
-      
-      let html = '';
-      workshops.forEach((workshop, index) => {
-        html += `
-          <div class="tile">
-            <h5>${workshop.name}</h5>
-            <table>
-              <tbody>`;
-        
-        if (workshop.rotationSchedule) {
-          workshop.rotationSchedule.forEach((schedule, slotIndex) => {
-            // Calculate actual time instead of generic slot
-            const timeSlot = calculateTimeSlot(workshop.startTime, slotIndex, workshop.workshopDuration || 40);
-            const groups = schedule.groups ? schedule.groups.join(', ') : schedule.group;
-            html += `
-                <tr><td>${timeSlot}</td><td>Group ${groups}</td></tr>`;
-          });
-        }
-        
-        html += `
-              </tbody>
-            </table>
-          </div>`;
-      });
-      
-      return html;
-    };
+         // Generate workshop rotation schedule with actual times
+     const generateWorkshopSchedule = (workshops) => {
+       if (!workshops || workshops.length === 0) return '';
+       
+       let html = '';
+       workshops.forEach((workshop, index) => {
+         html += `
+           <div class="tile">
+             <h5>${workshop.name}</h5>
+             <table>
+               <tbody>`;
+         
+         if (workshop.rotationSchedule) {
+           workshop.rotationSchedule.forEach((schedule, slotIndex) => {
+             // Calculate actual time instead of generic slot
+             const timeSlot = calculateTimeSlot(workshop.startTime, slotIndex, workshop.workshopDuration || 40);
+             const groups = schedule.groups ? schedule.groups.join(', ') : schedule.group;
+             
+             // Use the specific workshop subject name if available
+             const workshopName = workshop.selectedWorkshopSubjects && workshop.selectedWorkshopSubjects[slotIndex] 
+               ? workshop.selectedWorkshopSubjects[slotIndex] 
+               : workshop.name;
+             
+             html += `
+                 <tr><td>${timeSlot}</td><td>Group ${groups}</td></tr>`;
+           });
+         }
+         
+         html += `
+               </tbody>
+             </table>
+           </div>`;
+       });
+       
+       return html;
+     };
 
     // Generate assessment station schedule with actual times
     const generateAssessmentSchedule = (assessments) => {
@@ -318,16 +324,51 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
       return html;
     };
 
-    // Generate day schedule table
+    // Generate day schedule table with integrated workshops as visual blocks
     const generateDaySchedule = (day) => {
       const dayProgramme = getDayProgramme(day);
       let html = '';
+      let tableOpen = false;
       
       dayProgramme.forEach((session, index) => {
-        // Regular session - no workshop rotation expansion
-        html += `
-            <tr><td>${formatTime(session.startTime)}</td><td>${session.name}</td><td>${getFacultyNames(session)}</td><td>${getRoom(session)}</td></tr>`;
+        if (session.isWorkshopRotation && session.rotationSchedule) {
+          // Close table if it's open before workshop blocks
+          if (tableOpen) {
+            html += `
+            </tbody>
+          </table>`;
+            tableOpen = false;
+          }
+          
+          // Generate workshop blocks that visually interrupt the schedule
+          html += `
+          <!-- Workshop Blocks -->
+          <div class="four-grid" style="margin:6mm 0">
+            ${generateWorkshopSchedule([session])}
+          </div>`;
+          
+        } else {
+          // Regular session - ensure table is open
+          if (!tableOpen) {
+            html += `
+          <table class="sched-4col">
+            <colgroup><col/><col/><col/><col/></colgroup>
+            <thead><tr><th>Time</th><th>Session</th><th>Faculty</th><th>Room</th></tr></thead>
+            <tbody>`;
+            tableOpen = true;
+          }
+          
+          html += `
+              <tr><td>${formatTime(session.startTime)}</td><td>${session.name}</td><td>${getFacultyNames(session)}</td><td>${getRoom(session)}</td></tr>`;
+        }
       });
+      
+      // Close table if it's still open
+      if (tableOpen) {
+        html += `
+            </tbody>
+          </table>`;
+      }
       
       return html;
     };
@@ -536,19 +577,8 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
     <section class="section">
       <div class="section-title"> <span>Day 1 — ${selectedCourse.startDate}</span> <span>${location.name}</span> </div>
       <div class="section-body">
-        <div class="strip">Day 1 Schedule - Lectures, Workshops, and Assessment Stations</div>
-        <table class="sched-4col">
-          <colgroup><col/><col/><col/><col/></colgroup>
-          <thead><tr><th>Time</th><th>Session</th><th>Faculty</th><th>Room</th></tr></thead>
-          <tbody>
-            ${generateDaySchedule(1)}
-          </tbody>
-        </table>
-
-        <!-- Workshops 4-up -->
-        <div class="four-grid" style="margin-top:6mm">
-          ${generateWorkshopSchedule(getWorkshopRotations(1))}
-        </div>
+                 <div class="strip">Day 1 Schedule - Lectures, Workshops, and Assessment Stations</div>
+         ${generateDaySchedule(1)}
 
         <!-- Assessment Stations 4-up -->
         <div class="four-grid" style="margin-top:6mm">
@@ -561,23 +591,12 @@ const ProgrammeGenerator = ({ selectedCourse, onClose }) => {
     <section class="section">
       <div class="section-title"> <span>Day 2 — ${selectedCourse.endDate}</span> <span>${location.name}</span> </div>
       <div class="section-body">
-        <div class="strip">Day 2 Schedule - Practical Sessions, Workshops, and Wrap-up</div>
-        <table class="sched-4col">
-          <colgroup><col/><col/><col/><col/></colgroup>
-          <thead><tr><th>Time</th><th>Session</th><th>Faculty</th><th>Room</th></tr></thead>
-          <tbody>
-            ${generateDaySchedule(2)}
-          </tbody>
-        </table>
+                 <div class="strip">Day 2 Schedule - Practical Sessions, Workshops, and Wrap-up</div>
+         ${generateDaySchedule(2)}
 
         <!-- Practical Sessions (2 tiles as per PDF style if present) -->
         <div class="four-grid" style="grid-template-columns:1fr 1fr; gap:6mm; margin-top:6mm">
           ${generateAssessmentSchedule(getPracticalSessions(2))}
-        </div>
-
-        <!-- Workshops 2-up -->
-        <div class="four-grid" style="grid-template-columns:1fr 1fr; gap:6mm; margin-top:6mm">
-          ${generateWorkshopSchedule(getWorkshopRotations(2))}
         </div>
 
         <!-- Assessment Stations 4-up -->
