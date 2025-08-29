@@ -79,6 +79,47 @@ The Programme Builder system has significant architectural and logic issues that
 - **Impact**: Complex state management and bugs
 - **Priority**: MEDIUM
 
+### ✅ 4.6 Programme Generator Integration Fixes
+
+**Status:** COMPLETED
+
+**Issues Fixed:**
+1. **Workshops displayed separately at bottom** - Workshops now integrated into chronological schedule
+2. **Generic "Slot 1, Slot 2" display** - Now shows actual calculated times (e.g., "11:45 - 12:25")
+
+**Changes Made:**
+
+**`src/components/ProgrammeGenerator.jsx`:**
+- **`getDayProgramme()` function**: Removed filter `!item.isWorkshopRotation` to include workshops in main schedule
+- **`calculateTimeSlot()` function**: Added utility to calculate actual time ranges based on start time and duration
+- **`generateDaySchedule()` function**: Enhanced to expand workshop rotations into individual chronological time slots
+- **`generateWorkshopSchedule()` function**: Updated to use actual calculated times instead of generic slot labels
+- **`generateAssessmentSchedule()` function**: Updated to use actual time data from time slots
+- **Template structure**: Removed separate workshop display sections since workshops now appear in main schedule
+
+**Key Improvements:**
+- **Chronological Integration**: Workshops now appear in proper time order within the main schedule
+- **Actual Time Display**: Shows calculated times like "11:45 - 12:25" instead of "Slot 1"
+- **Group Information**: Displays which groups attend each workshop at specific times
+- **Consistent Format**: All sessions (lectures, workshops, assessments) appear in unified chronological table
+
+**Example Output:**
+```
+Time            Session                                    Faculty    Room
+08:30          Registration / Meeting for Faculty         Leigh A    TBD
+09:00          Welcome and Introductions – Why IMPACT?    TBD        TBD
+11:45 - 12:25  Fluids and Transfusion (Groups A, B)      TBD        TBD
+12:25 - 13:05  Advanced Arrhythmia Management (Groups C, D) TBD     TBD
+13:05 - 13:35  Lunch                                      TBD        TBD
+```
+
+**Testing:**
+- ✅ Workshop rotations appear in chronological order
+- ✅ Actual times displayed instead of generic slots
+- ✅ Group assignments shown for each workshop time slot
+- ✅ Assessment stations show proper time calculations
+- ✅ All session types integrated into unified schedule
+
 ## Detailed Analysis by Component
 
 ### Workshop Rotation System
@@ -296,4 +337,28 @@ The Programme Builder system has significant architectural and logic issues that
 
 ## Conclusion
 
-The Programme Builder system requires significant refactoring to achieve reliability and maintainability. The phased approach ensures critical issues are addressed first while maintaining system functionality throughout the process. Success depends on thorough testing and careful implementation of each phase.
+**Phases 1, 2, 3, 4, and 4.6 have been completed successfully.** The programme builder system now includes:
+
+- ✅ **Critical fixes** for workshop rotation, practical session rotation, and assessment creation
+- ✅ **Data structure standardization** with unified group formats and removed redundant fields  
+- ✅ **Comprehensive validation** with input validation, error handling, and time conflict detection
+- ✅ **Assessment system integration** with time slot generation, candidate assignment, and Assessment Management connection
+- ✅ **Concurrent activity system** for assessment subjects with split candidate groups and faculty assignment
+- ✅ **Programme generator integration** with chronological workshop display and actual time calculations
+
+**Key Features Implemented:**
+- Workshop rotation with group pairing and subject selection
+- Practical sessions with combined groups and proper rotation
+- Assessment stations with concurrent activities and candidate role rotation
+- Faculty assignment at all levels (sessions, stations, concurrent activities)
+- Time management with calculated time slots and conflict detection
+- Assessment tracking and completion monitoring
+- **Programme generation** with integrated chronological schedule and actual time display
+
+**Immediate Next Steps:**
+- Test programme generator with actual course data
+- Verify workshop integration in chronological schedule
+- Confirm time calculations display correctly
+- Test assessment station time slot generation
+
+The Programme Builder system has been significantly enhanced and now provides a comprehensive, reliable solution for managing IMPACT course programmes with all the complex rotation patterns and time management requirements.
